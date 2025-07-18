@@ -16,13 +16,13 @@ new class extends Component
     }
 }; ?>
 
-<nav x-data="{ mobileMenuOpen: false, userMenuOpen: false, vehicleMenuOpen: false }" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+<nav x-data="{ mobileMenuOpen: false, userMenuOpen: false, shoppingMenuOpen: false }" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex items-center">
                 <!-- Mobile menu button -->
                 <div class="flex items-center lg:hidden mr-2">
-                    <div x-data="{ open: false, vehicleMenuOpen: false }" class="relative">
+                    <div x-data="{ open: false, shoppingMenuOpen: false }" class="relative">
                         <x-navbar.hamburguer-menu />
                         <x-navbar.mobile-menu />
                     </div>
