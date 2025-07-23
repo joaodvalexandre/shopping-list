@@ -13,13 +13,12 @@
                         @csrf
 
                         <div class="flex flex-col gap-2">
-                            <!-- Select -->
+                            <!-- Name -->
                             <div class="flex-1">
-                                <x-input.select
-                                    name="item_id"
-                                    label="{{ __('item') }}"
-                                    :items="$items"
-                                    addNew="item"
+                                <x-input.input
+                                    name="name"
+                                    label="name"
+                                    type="text"
                                 />
                             </div>
 

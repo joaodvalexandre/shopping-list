@@ -5,7 +5,4 @@
     <x-nav-link :href="route('shopping_list.index')" :active="request()->routeIs('shopping_list*')" wire:navigate class="text-gray-900 dark:text-gray-100">
         {{ __('shopping_list') }}
     </x-nav-link>
-    <x-nav-link :href="route('item.index')" :active="request()->routeIs('item*')" wire:navigate class="text-gray-900 dark:text-gray-100">
-        {{ __('item') }}
-    </x-nav-link>
 </div>

@@ -15,8 +15,6 @@ Route::resource('shopping_list', ShoppingListController::class)->except(['show']
 Route::get('shopping_list/export', [ShoppingListController::class, 'export'])->name('shopping_list.export');
 Route::patch('shopping_list/{shoppingList}/change-status/{newStatus}', [ShoppingListController::class, 'changeStatus'])->name('shopping_list.changeStatus');
 
-Route::resource('item', ItemController::class)->except(['show']);
-
 Route::get('switch-language/{locale}', function (string $locale) {
     if (! in_array($locale, ['en', 'pt'])) {
         abort(400);

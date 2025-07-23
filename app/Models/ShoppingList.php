@@ -6,15 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class ShoppingList extends Model
 {
-    protected $fillable = ['item_id', 'quantity', 'status_id'];
+    protected $table = 'list'; // because your table name is "list"
 
-    // Relation to Item
-    public function item()
+    protected $fillable = ['shopping_list_id', 'item_name', 'quantity', 'status_id'];
+
+    /**
+     * Each item belongs to a shopping list.
+     */
+    public function shoppingList()
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsTo(ShoppingLists::class, 'shopping_list_id');
     }
 
-    // Relation to Status
+    /**
+     * Each item has a status (e.g., pending, purchased).
+     */
     public function status()
     {
         return $this->belongsTo(Status::class);

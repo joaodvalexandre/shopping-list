@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Item;
 use App\Models\ShoppingList;
 use App\Models\Status;
 use Illuminate\Http\Request;
@@ -18,12 +17,9 @@ class ShoppingListController extends Controller
 
     public function create()
     {
-        $locale = app()->getLocale();
-        $items = Item::where('language', $locale)->get();
-
         $status = Status::all();
 
-        return view('shopping_list.create', compact('status', 'items'));
+        return view('shopping_list.create', compact('status'));
     }
 
     public function store(Request $request)
