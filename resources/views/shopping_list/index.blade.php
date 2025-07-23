@@ -12,9 +12,9 @@
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-lg font-semibold">{{ __('your_shopping_items') }}</h3>
                         <div>
-                            <button id="exportButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105 mr-2">
+                            {{-- <button id="exportButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105 mr-2">
                                 <i class="fas fa-file-export mr-2"></i>{{ __('export_to_text') }}
-                            </button>
+                            </button> --}}
                             <a href="{{ route('shopping_list.create') }}" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
                                 <i class="fas fa-plus mr-2"></i>{{ __('add_item') }}
                             </a>

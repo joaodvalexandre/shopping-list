@@ -21,12 +21,12 @@
         <!-- Slider with Icon -->
         <span
             :class="{ 'translate-x-8': darkMode, 'translate-x-0': !darkMode }"
-            class="absolute left-1 top-1 flex items-center justify-center w-6 h-6 bg-white rounded-full transform transition-transform duration-300 text-neutral-800 dark:text-neutral-200">
+            class="absolute left-1 top-1 flex items-center justify-center w-6 h-6 bg-white rounded-full transform transition-transform duration-300 text-neutral-800">
             <span x-show="!darkMode">
-                <x-sun class="w-6 h-6 text-neutral-800 dark:text-neutral-200" />
+                <x-custom-icon package="solar" icon="sun-bold" />
             </span>
             <span x-show="darkMode">
-                <x-moon class="w-6 h-6 text-neutral-800 dark:text-neutral-200" />
+                <x-custom-icon package="solar" icon="moon-bold" />
             </span>
         </span>
     </button>

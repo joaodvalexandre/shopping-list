@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Item;
 use App\Models\ShoppingList;
 use App\Models\Status;
 use Illuminate\Http\Request;
@@ -17,14 +18,18 @@ class ShoppingListController extends Controller
 
     public function create()
     {
+        $locale = app()->getLocale();
+        $items = Item::where('language', $locale)->get();
+
         $status = Status::all();
-        return view('shopping_list.create', compact('status'));
+
+        return view('shopping_list.create', compact('status', 'items'));
     }
 
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'name' => 'required|max:255',
+            'item_id' => 'required',
             'quantity' => 'required|integer|min:1',
             'status_id' => 'sometimes|exists:status,id',
         ]);

@@ -10,12 +10,11 @@ return new class extends Migration
     {
         Schema::create('shopping_lists', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('item_id');
+            $table->string('name');
             $table->integer('quantity')->default(1);
             $table->unsignedBigInteger('status_id')->nullable();
             $table->timestamps();
 
-            $table->foreign('item_id')->references('id')->on('items')->onDelete('cascade');
             $table->foreign('status_id')->references('id')->on('status')->onDelete('set null');
         });
     }

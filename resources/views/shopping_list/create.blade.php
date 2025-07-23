@@ -11,21 +11,39 @@
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     <form action="{{ route('shopping_list.store') }}" method="POST">
                         @csrf
-                        <div class="mb-4">
-                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ __('name') }}</label>
-                            <input type="text" name="name" id="name" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+
+                        <div class="flex flex-col gap-2">
+                            <!-- Select -->
+                            <div class="flex-1">
+                                <x-input.select
+                                    name="item_id"
+                                    label="{{ __('item') }}"
+                                    :items="$items"
+                                    addNew="item"
+                                />
+                            </div>
+
+                            <!-- Quantity -->
+                            <div class="flex-1">
+                                <x-input.input
+                                    name="quantity"
+                                    label="quantity"
+                                    type='number'
+                                    value="1"
+                                />
+                            </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ __('quantity') }}</label>
-                            <input type="number" name="quantity" id="quantity" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600" required>
-                        </div>
-
-                        <div class="flex items-center justify-end mt-4">
-                            <a href="{{ route('shopping_list.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 mr-2" wire:navigate>
+                        <!-- Buttons aligned to right -->
+                        <div class="flex items-center justify-end space-x-2 mt-4">
+                            <a href="{{ route('shopping_list.index') }}"
+                            class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                            wire:navigate>
                                 {{ __('back_to_list') }}
                             </a>
-                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150">
+
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150">
                                 {{ __('create') }}
                             </button>
                         </div>
