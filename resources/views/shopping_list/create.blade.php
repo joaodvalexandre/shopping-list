@@ -21,16 +21,6 @@
                                     type="text"
                                 />
                             </div>
-
-                            <!-- Quantity -->
-                            <div class="flex-1">
-                                <x-input.input
-                                    name="quantity"
-                                    label="quantity"
-                                    type='number'
-                                    value="1"
-                                />
-                            </div>
                         </div>
 
                         <!-- Buttons aligned to right -->

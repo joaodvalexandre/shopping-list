@@ -1,4 +1,9 @@
-<!-- resources/views/layouts/app.blade.php -->
+@php
+    use App\Models\Page;
+    // Get Parent route name from pages table
+    $route = explode('.', Route::currentRouteName())[0];
+@endphp
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -20,21 +25,21 @@
         @livewireStyles
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div class="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
             <livewire:layout.navigation />
 
             <!-- Page Heading -->
-            @if (isset($header))
-                <header class="bg-white dark:bg-gray-800 shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endif
+            <header class="bg-white dark:bg-gray-800 shadow text-black dark:text-white">
+                <div class="max-w-7xl mx-auto py-4 px-6">
+                    {{ __($route) }}
+                </div>
+            </header>
 
             <!-- Page Content -->
-            <main>
-                {{ $slot }}
+            <main class="py-4">
+                <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-sm lg:rounded-lg">
+                    {{ $slot }}
+                </div>
             </main>
         </div>
         @livewireScripts

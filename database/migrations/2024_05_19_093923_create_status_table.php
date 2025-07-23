@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('status', function (Blueprint $table) {
             $table->id(); // Auto-incrementing primary key
-            $table->string('status', 100)->unique(); // Unique for distinct status names
             $table->string('code', 100)->unique(); // Unique for distinct status names
             $table->string('color', 7)->default('#000000'); // HEX color with default
             $table->timestamps(); // Created_at and updated_at timestamps

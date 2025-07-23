@@ -4,7 +4,7 @@
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
     "
-    class="flex items-center justify-center p-4 ml-auto">
+    class="flex items-center justify-center py-4 ml-auto">
     <!-- Toggle Container -->
     <button
         @click="

@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up()
     {
-        Schema::create('list', function (Blueprint $table) {
+        Schema::create('items', function (Blueprint $table) {
             $table->id();
 
             $table->unsignedBigInteger('shopping_list_id'); // Reference to shopping_lists
-            $table->string('item_name');                    // Free-form item name
+            $table->string('name');                    // Free-form item name
             $table->integer('quantity')->default(1);        // Quantity for this item
             $table->unsignedBigInteger('status_id')->nullable(); // Status of the item
 
@@ -29,6 +29,6 @@ return new class extends Migration
 
     public function down()
     {
-        Schema::dropIfExists('list');
+        Schema::dropIfExists('items');
     }
 };

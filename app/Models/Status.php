@@ -17,23 +17,6 @@ class Status extends Model
     protected $table = 'status';
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var array
-     */
-    protected $fillable = [
-        'status',
-        'color',
-    ];
-
-    /**
-     * Indicates if the model should be timestamped.
-     *
-     * @var bool
-     */
-    public $timestamps = true;
-
-    /**
      * Get the color as an HTML style.
      *
      * @return string
