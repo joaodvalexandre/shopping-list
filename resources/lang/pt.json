@@ -43,5 +43,7 @@
   "update": "Atualizar",
   "export_to_text": "Exportar para Texto",
   "confirm_delete": "Tens a certeza de que queres eliminar este item?",
-  "no_items_yet": "Ainda não adicionaste nenhum item à tua lista de compras. Adiciona já alguns! :)"
+  "no_items_yet": "Ainda não adicionaste nenhum item à tua lista de compras. Adiciona já alguns! :)",
+  "dashboard_information": "Aqui é onde irá aparecer todas as listas de compras criadas. Começa a criar novas, para poderem aparecer aqui!",
+  "no_items_list": "Nenhum item nesta lista de compras"
 }

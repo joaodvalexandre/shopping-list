@@ -1,15 +1,15 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ShoppingListController;
-use App\Http\Controllers\ItemController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
 });
 
-Route::view('dashboard', 'dashboard')->name('dashboard');
+Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 Route::resource('shopping_list', ShoppingListController::class);
 

@@ -37,9 +37,15 @@
 
             <!-- Page Content -->
             <main class="py-4">
-                <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-sm lg:rounded-lg">
-                    {{ $slot }}
-                </div>
+                @if($route == 'dashboard')
+                    <div class="text-gray-900 dark:text-gray-100 max-w-7xl mx-auto">
+                        {{ $slot }}
+                    </div>
+                @else
+                    <div class="flex flex-col gap-4 p-6 text-gray-900 dark:text-gray-100 max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-sm lg:rounded-lg">
+                        {{ $slot }}
+                    </div>
+                @endif
             </main>
         </div>
         @livewireScripts

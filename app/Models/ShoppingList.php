@@ -57,7 +57,11 @@ class ShoppingList extends Model
         $total = $this->getTotalItems();
 
         if ($total === 0) {
-            return ['name' => 'no_items', 'color' => '#6B7280']; // gray
+            return [
+                'name' => 'no_items',
+                'color' => 'gray',
+                'icon' => 'cart-off'
+            ];
         }
 
         $toBuy = $this->getPendingItems();
@@ -65,21 +69,41 @@ class ShoppingList extends Model
         $purchased = $this->getPurchasedItems();
 
         if ($purchased === $total) {
-            return ['name' => 'finished', 'color' => '#4CAF50']; // green
+            return [
+                'name' => 'finished',
+                'color' => 'green',
+                'icon' => 'check-circle'
+            ];
         }
 
         if ($inCart === $total) {
-            return ['name' => 'all_in_cart', 'color' => '#1E90FF']; // blue
+            return [
+                'name' => 'all_in_cart',
+                'color' => 'blue',
+                'icon' => 'cart-check'
+            ];
         }
 
         if ($inCart > 0) {
-            return ['name' => 'shopping', 'color' => '#FFA500']; // yellow
+            return [
+                'name' => 'shopping',
+                'color' => 'orange',
+                'icon' => 'cart-outline'
+            ];
         }
 
         if ($toBuy === $total) {
-            return ['name' => 'pending', 'color' => '#F97316']; // orange
+            return [
+                'name' => 'pending',
+                'color' => 'yellow',
+                'icon' => 'cart-arrow-down'
+            ];
         }
 
-        return ['name' => 'mixed', 'color' => '#8B5CF6']; // purple
+        return [
+            'name' => 'mixed',
+            'color' => 'purple',
+            'icon' => 'playlist-check'
+        ];
     }
 }

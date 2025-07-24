@@ -17,7 +17,7 @@ new class extends Component
 }; ?>
 
 <nav x-data="{ mobileMenuOpen: false, userMenuOpen: false, shoppingMenuOpen: false }" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-    <div class="max-w-7xl mx-auto px-6">
+    <div class="max-w-7xl mx-auto lg:px-6">
         <div class="flex justify-between h-16">
             <div class="flex items-center">
                 <!-- Mobile menu button -->
