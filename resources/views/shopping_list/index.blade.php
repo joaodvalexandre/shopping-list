@@ -44,7 +44,7 @@
                                 <div class="flex flex-row gap-2">
                                     <a href="{{ route('shopping_list.show', $item) }}"
                                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" wire:navigate>
-                                        <x-custom-icon icon="eye"/>
+                                        <x-custom-icon icon="format-list-bulleted"/>
                                     </a>
                                     <a href="{{ route('shopping_list.edit', $item) }}"
                                         class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>

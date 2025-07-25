@@ -3,15 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
+use App\Models\ShoppingList;
 use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 
 class ItemController extends Controller
 {
-    public function create()
+    public function create(Request $request)
     {
-        return view('item.create');
+        $list_id = $request->query('list_id');
+        return view('item.create', compact('list_id'));
     }
 
     // public function store(Request $request)

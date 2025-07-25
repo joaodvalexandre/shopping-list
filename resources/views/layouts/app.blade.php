@@ -1,7 +1,6 @@
 @php
     use App\Models\Page;
-    // Get Parent route name from pages table
-    $route = explode('.', Route::currentRouteName())[0];
+    $route = (explode('.', Route::currentRouteName())[0] == 'item') ? 'shopping_list' : explode('.', Route::currentRouteName())[0];
 @endphp
 
 <!DOCTYPE html>

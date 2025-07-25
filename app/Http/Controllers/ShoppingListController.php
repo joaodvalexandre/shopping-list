@@ -41,6 +41,11 @@ class ShoppingListController extends Controller
         return view('shopping_list.create');
     }
 
+    public function create_item()
+    {
+        return view('shopping_list.create_item');
+    }
+
     public function store(Request $request)
     {
         $validatedData = $request->validate([

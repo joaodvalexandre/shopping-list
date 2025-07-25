@@ -14,7 +14,7 @@
     <x-dropdown-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
         {{ __('dashboard') }}
     </x-dropdown-nav-link>
-    <x-dropdown-nav-link :href="route('shopping_list.index')" :active="request()->routeIs('shopping_list*')" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
+    <x-dropdown-nav-link :href="route('shopping_list.index')" :active="request()->routeIs(['shopping_list*', 'item*'])" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
         {{ __('shopping_list') }}
     </x-dropdown-nav-link>
 </div>

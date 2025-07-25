@@ -29,10 +29,10 @@
         </div>
         <div class="flex flex-row gap-2">
             <!-- TODO: Improve this method, to something better in the future -->
-            <a href="{{ route('shopping_list.create') }}" class="flex flex-row gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
+            <a href="{{ route('shopping_list.export', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
                 <x-custom-icon icon="download"/><span class="hidden sm:block">{{ __('export') }}</span>
             </a>
-            <a href="{{ route('shopping_list.create') }}" class="flex flex-row gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
+            <a href="{{ route('shopping_list.create_item', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
                 <x-custom-icon icon="plus"/><span class="hidden sm:block">{{ __('new_item') }}</span>
             </a>
         </div>
@@ -132,11 +132,11 @@
                                 <div class="flex flex-row gap-2">
                                     <!-- To buy -->
                                     @if($item->status->id == 1)
-                                        <a href="{{ route('item.add_cart', $item) }}"
+                                        <a href="{{ route('shopping_list.add_cart', ['item_id' => $item->id]) }}"
                                             class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" wire:navigate>
                                             <x-custom-icon icon="cart-arrow-down"/>
                                         </a>
-                                        <a href="{{ route('item.edit', $item) }}"
+                                        <a href="{{ route('shopping_list.edit_item', ['list_id' => $shoppingList->id, 'item_id' => $item->id]) }}"
                                             class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
                                             <x-custom-icon icon="pencil"/>
                                         </a>
@@ -144,18 +144,18 @@
 
                                     <!-- In Cart -->
                                     @if($item->status->id == 2)
-                                        <a href="{{ route('item.remove_cart', $item) }}"
+                                        <a href="{{ route('shopping_list.remove_cart', ['item_id' => $item->id]) }}"
                                             class="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-600" wire:navigate>
                                             <x-custom-icon icon="cart-arrow-up"/>
                                         </a>
-                                        <a href="{{ route('item.mark_purchased', $item) }}"
+                                        <a href="{{ route('shopping_list.mark_purchased', ['item_id' => $item->id]) }}"
                                             class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-600" wire:navigate>
                                             <x-custom-icon icon="cart-check"/>
                                         </a>
                                     @endif
 
                                     <!-- Delete -->
-                                    <x-delete-button action="{{ route('item.destroy', $item) }}" />
+                                    <x-delete-button action="{{ route('shopping_list.destroy_item', ['list_id' => $shoppingList->id, 'item_id' => $item->id]) }}" />
                                 </div>
                             </td>
                         </tr>
