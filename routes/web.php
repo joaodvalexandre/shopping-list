@@ -14,6 +14,12 @@ Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard'
 
 Route::resource('shopping_list', ShoppingListController::class);
 
+Route::resource('item', ItemController::class);
+
+// TODO: Addd routes for add_cart, remove_cart, mark_purchased
+Route::get('item/add_cart', [ItemController::class, 'add_cart'])->name('item.add_cart');
+Route::get('item/remove_cart', [ItemController::class, 'remove_cart'])->name('item.remove_cart');
+Route::get('item/mark_purchased', [ItemController::class, 'mark_purchased'])->name('item.mark_purchased');
 Route::get('item/export', [ItemController::class, 'export'])->name('item.export');
 Route::patch('item/change-status/{newStatus}', [ItemController::class, 'changeStatus'])->name('item.changeStatus');
 

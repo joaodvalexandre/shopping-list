@@ -34,7 +34,7 @@
                 {{ __($title) }}
             </h4>
 
-            @if($data->total_items == 0)
+            @if($data->total == 0)
                 <!-- Message when no items exist -->
                 <div class="flex items-center justify-center h-24 text-center">
                     <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">

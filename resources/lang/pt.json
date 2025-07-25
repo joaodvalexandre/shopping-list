@@ -5,6 +5,10 @@
     "purchased":                "Comprado",
     "total":                    "Total",
     "no_items":                 "Sem items",
+    "finished":                 "Terminado",
+    "all_in_cart":              "Tudo no carrinho",
+    "shopping":                 "Às compras...",
+    "mixed":                    "Misto",
 
     "test_message":             "Esta é uma mensagem de teste, para testar tanto a tradução como a apresentação do texto.",
 

@@ -19,7 +19,7 @@
         $size=32;
     @endphp
     <div class="text-xl">
-        {{ $shoppingList->name}}
+        {{ $shoppingList->name }}
     </div>
     <div class="flex justify-between items-center">
         <div class="flex flex-row gap-2">
@@ -28,6 +28,7 @@
             </a>
         </div>
         <div class="flex flex-row gap-2">
+            <!-- TODO: Improve this method, to something better in the future -->
             <a href="{{ route('shopping_list.create') }}" class="flex flex-row gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
                 <x-custom-icon icon="download"/><span class="hidden sm:block">{{ __('export') }}</span>
             </a>
@@ -129,14 +130,32 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">
                                 <div class="flex flex-row gap-2">
-                                    <a href="{{ route('shopping_list.show', $item->id) }}"
-                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600">
-                                        <x-custom-icon icon="eye"/>
-                                    </a>
-                                    <a href="{{ route('shopping_list.destroy', $item->id) }}"
-                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-600">
-                                        <x-custom-icon icon="trash"/>
-                                    </a>
+                                    <!-- To buy -->
+                                    @if($item->status->id == 1)
+                                        <a href="{{ route('item.add_cart', $item) }}"
+                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" wire:navigate>
+                                            <x-custom-icon icon="cart-arrow-down"/>
+                                        </a>
+                                        <a href="{{ route('item.edit', $item) }}"
+                                            class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
+                                            <x-custom-icon icon="pencil"/>
+                                        </a>
+                                    @endif
+
+                                    <!-- In Cart -->
+                                    @if($item->status->id == 2)
+                                        <a href="{{ route('item.remove_cart', $item) }}"
+                                            class="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-600" wire:navigate>
+                                            <x-custom-icon icon="cart-arrow-up"/>
+                                        </a>
+                                        <a href="{{ route('item.mark_purchased', $item) }}"
+                                            class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-600" wire:navigate>
+                                            <x-custom-icon icon="cart-check"/>
+                                        </a>
+                                    @endif
+
+                                    <!-- Delete -->
+                                    <x-delete-button action="{{ route('item.destroy', $item) }}" />
                                 </div>
                             </td>
                         </tr>

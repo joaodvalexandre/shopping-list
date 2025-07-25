@@ -30,7 +30,7 @@ class ShoppingList extends Model
     private function getItemsByStatus(string $statusName): int
     {
         return $this->items()
-            ->whereHas('status', fn($q) => $q->where('name', $statusName))
+            ->whereHas('status', fn($q) => $q->where('code', $statusName))
             ->count();
     }
 

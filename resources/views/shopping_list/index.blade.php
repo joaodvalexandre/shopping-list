@@ -36,8 +36,8 @@
                             <td class="px-6 py-4 whitespace-nowrap text-right">{{ $item->purchased }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">{{ $item->total }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-{{$item->status['color']}}-500">
-                                    {{ __($item->status['name']) }}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-{{$item->status['color']}}-500 {{ ($item->status['color'] == 'yellow') ? 'text-black' : 'text-white'}}">
+                                    <span class="">{{ __($item->status['name']) }}</span>
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">
@@ -45,6 +45,10 @@
                                     <a href="{{ route('shopping_list.show', $item) }}"
                                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" wire:navigate>
                                         <x-custom-icon icon="eye"/>
+                                    </a>
+                                    <a href="{{ route('shopping_list.edit', $item) }}"
+                                        class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
+                                        <x-custom-icon icon="pencil"/>
                                     </a>
                                     <x-delete-button action="{{ route('shopping_list.destroy', $item) }}" />
                                 </div>
