@@ -14,10 +14,10 @@ class DashboardController extends Controller
         // Add dynamic status attribute to each list
         $shoppingList->each(function ($list) {
             $list->status = $list->calculateStatus();
-            $list->pending_items = $list->getPendingItems();
-            $list->in_cart_items = $list->getInCartItems();
-            $list->purchased_items = $list->getPurchasedItems();
-            $list->total_items = $list->getTotalItems();
+            $list->pending = $list->getPendingItems();
+            $list->in_cart = $list->getInCartItems();
+            $list->purchased = $list->getPurchasedItems();
+            $list->total = $list->getTotalItems();
         });
 
         return view('dashboard', compact('shoppingList'));

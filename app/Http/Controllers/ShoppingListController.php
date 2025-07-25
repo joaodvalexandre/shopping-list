@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Item;
 use App\Models\ShoppingList;
 use App\Models\Status;
 use Illuminate\Http\Request;
@@ -17,18 +18,22 @@ class ShoppingListController extends Controller
         // Add dynamic status attribute to each list
         $shoppingList->each(function ($list) {
             $list->status = $list->calculateStatus();
-            $list->pending_items = $list->getPendingItems();
-            $list->in_cart_items = $list->getInCartItems();
-            $list->purchased_items = $list->getPurchasedItems();
-            $list->total_items = $list->getTotalItems();
+            $list->pending = $list->getPendingItems();
+            $list->in_cart = $list->getInCartItems();
+            $list->purchased = $list->getPurchasedItems();
+            $list->total = $list->getTotalItems();
         });
 
         return view('shopping_list.index', compact('shoppingList'));
     }
 
-    public function show()
+    public function show(ShoppingList $shoppingList)
     {
-        return view ('shopping_list.show');
+        $items = Item::with('status')
+                    ->where('shopping_list_id', $shoppingList->id)
+                    ->orderBy('status_id')
+                    ->get();
+        return view ('shopping_list.show', compact('items', 'shoppingList'));
     }
 
     public function create()
@@ -45,7 +50,7 @@ class ShoppingListController extends Controller
         ShoppingList::create($validatedData);
 
         $this->notificationToggle('list_created_success', 'success');
-        return redirect()->route('shopping_list.index')->with('success', __('list_created_success'));
+        return redirect()->route('shopping_list.index');
     }
 
     public function edit(ShoppingList $shoppingList)
@@ -62,13 +67,16 @@ class ShoppingListController extends Controller
         $shoppingList->update($validatedData);
 
         $this->notificationToggle('list_updated_success', 'success');
-        return redirect()->route('shopping_list.index')->with('success', __('list_updated_success'));
+        return redirect()->route('shopping_list.index');
     }
 
     public function destroy(ShoppingList $shoppingList)
     {
-        $shoppingList->delete();
-        $this->notificationToggle('list_destroyed_success', 'success');
-        return redirect()->route('shopping_list.index')->with('success', __('list_destroyed_success'));
+        if($shoppingList->delete())
+            $this->notificationToggle('list_destroyed_success', 'success');
+        else
+            $this->notificationToggle('list_destroyed_error', 'error');
+
+        return redirect()->route('shopping_list.index');
     }
 }

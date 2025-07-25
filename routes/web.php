@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ItemController;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ShoppingListController;
@@ -13,8 +14,8 @@ Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard'
 
 Route::resource('shopping_list', ShoppingListController::class);
 
-Route::get('item/export', [ShoppingListController::class, 'export'])->name('item.export');
-Route::patch('item/change-status/{newStatus}', [ShoppingListController::class, 'changeStatus'])->name('item.changeStatus');
+Route::get('item/export', [ItemController::class, 'export'])->name('item.export');
+Route::patch('item/change-status/{newStatus}', [ItemController::class, 'changeStatus'])->name('item.changeStatus');
 
 Route::get('switch-language/{locale}', function (string $locale) {
     if (! in_array($locale, ['en', 'pt'])) {
