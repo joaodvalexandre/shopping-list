@@ -20,6 +20,6 @@
         class="text-lg font-semibold bg-yellow-400 text-black hover:bg-yellow-600 hover:text-white transition-all duration-300 ease-in-out px-6 py-2 rounded-lg">
         Trigger Warning
     </button>
-    <p>Livewire Component</p>
+    <p>Livewire Component</p> 
     <livewire:dashboard-buttons />
 </x-app-layout>
