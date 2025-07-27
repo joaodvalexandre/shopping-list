@@ -28,6 +28,7 @@
 
     "name":                     "Nome",
     "quantity":                 "Quantidade",
+    "quant":                    "Quant.",
     "status":                   "Estado",
     "new_list":                 "Nova Lista",
     "new_item":                 "Novo Item",

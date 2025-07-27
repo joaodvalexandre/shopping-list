@@ -1,10 +1,13 @@
 @props([
     'name',
     'label' => null,
-    'type' => 'text',      // text, number, email, etc.
+    'type' => 'text',       // text, number, email, etc.
     'value' => null,
     'placeholder' => '',
-    'rows' => 4,           // for textarea only
+    'min' => '0',           // can only be used if it is number
+    'max' => '100',         // can only be used if it is number
+    'step' => '1',          // can only be used if it is number
+    'rows' => 4,            // for textarea only
     'required' => false,
 ])
 
@@ -32,6 +35,7 @@
             type="{{ $type }}"
             name="{{ $name }}"
             id="{{ $name }}"
+            {{ ($type == 'number') ?  'min=' . $min . ' max=' . $max . ' step=' . $step : ''}}
             value="{{ old($name, $value) }}"
             placeholder="{{ $placeholder }}"
             {{ ($required) ? 'required' : '' }}

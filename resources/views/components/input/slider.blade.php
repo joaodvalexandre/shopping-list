@@ -10,7 +10,7 @@
 <div class="w-full flex flex-col gap-1">
     @if($label)
         <label for="{{ $name }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ $label }}
+            {{ __($label) }}
         </label>
     @endif
 

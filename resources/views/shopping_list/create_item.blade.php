@@ -2,19 +2,27 @@
     <div class="text-xl">
         {{ __('create') }}
     </div>
-    <form action="{{ route('shopping_list.store_item') }}" method="POST">
+    <form action="{{ route('shopping_list.store_item', ['list_id' => $list_id]) }}" method="POST">
         @csrf
 
         <div class="flex flex-col gap-2">
             <!-- Name -->
-            <div class="flex-1">
-                <x-input.input
-                    name="name"
-                    label="name"
-                    type="text"
-                    required
-                />
-            </div>
+            <x-input.input
+                name="name"
+                label="name"
+                type="text"
+                required
+            />
+
+            <!-- Quantity -->
+            <x-input.input
+                name="quantity"
+                label="quantity"
+                type="number"
+                min="1"
+                value="1"
+                required
+            />
         </div>
 
         <!-- Buttons aligned to right -->
