@@ -7,6 +7,7 @@ use App\Models\ShoppingList;
 use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Jenssegers\Agent\Agent;
 
 class ShoppingListController extends Controller
 {
@@ -29,19 +30,21 @@ class ShoppingListController extends Controller
 
     public function show(ShoppingList $shoppingList)
     {
-        $items = Item::with('status')
-                    ->where('shopping_list_id', $shoppingList->id)
-                    ->orderBy('status_id')
-                    ->get();
+        $items = Item::with('status')->where('shopping_list_id', $shoppingList->id)->orderBy('status_id')->get();
+        $itemsQueue = Item::with('status')->where('shopping_list_id', $shoppingList->id)->where('status_id', 1)->count();
+        $itemsInCart = Item::with('status')->where('shopping_list_id', $shoppingList->id)->where('status_id', 2)->count();
+        $itemsPurchased = Item::with('status')->where('shopping_list_id', $shoppingList->id)->where('status_id', 3)->count();
 
-        $itemsInCart = Item::with('status')
-                        ->where('shopping_list_id', $shoppingList->id)
-                        ->where('status_id', 2)
-                        ->count();
+        // Disables finish list button
+        if($itemsQueue != 0 || $itemsInCart != 0)
+            $allInCart = ($itemsQueue+$itemsInCart == $itemsInCart);
+        else
+            $allInCart = false;
 
-        $allInCart = $items->count() == $itemsInCart;
+        // Checks if the list has any item
+        $listHasItems = $items->count() > 0;
 
-        return view ('shopping_list.show', compact('items', 'shoppingList', 'allInCart'));
+        return view ('shopping_list.show', compact('items', 'shoppingList', 'allInCart', 'listHasItems'));
     }
 
     // List
@@ -155,6 +158,33 @@ class ShoppingListController extends Controller
         return redirect()->route('shopping_list.show', $list_id);
     }
 
+    public function export(Request $request){
+        $agent = new Agent();
+        $isMobile = $agent->isMobile();
+
+        if ($isMobile)
+            dd('Mobile FTW!!!');
+        else
+            dd('Desktop Filth!!!');
+
+
+        // // Your list data
+        // $items = ['Apples', 'Bananas', 'Milk'];
+        // $content = "# 🛒 Shopping List\n\n";
+        // foreach ($items as $item) {
+        //     $content .= "- [ ] $item\n";
+        // }
+
+        // if ($isMobile) {
+        //     return response($content)
+        //         ->header('Content-Type', 'text/markdown')
+        //         ->header('Content-Disposition', 'attachment; filename="shopping_list.md"');
+        // }
+
+        // // Fallback for desktop (e.g., show on screen)
+        // return view('shopping_list.preview', compact('items'));
+    }
+
     // Status Update
     public function add_cart($item_id)
     {
@@ -170,7 +200,7 @@ class ShoppingListController extends Controller
 
     public function mark_purchased($list_id)
     {
-        $items = Item::where('shopping_list_id', $list_id)->get();
+        $items = Item::where('shopping_list_id', $list_id)->where('status_id', 2)->get();
         foreach($items as $item){
             $this->changeStatus($item->id, 3, '', true);
         }

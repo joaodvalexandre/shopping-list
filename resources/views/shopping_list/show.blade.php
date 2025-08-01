@@ -30,14 +30,17 @@
             </a>
         </div>
         <div class="flex flex-row gap-2">
-            <a href="{{ !$allInCart ? '#' : route('shopping_list.mark_purchased', ['list_id' => $shoppingList->id]) }}"
-                class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$allInCart ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105' }}"
-                @if(!$allInCart) onclick="return false;" @endif>
+            <a href="{{ !$allInCart || !$listHasItems ? '#' : route('shopping_list.mark_purchased', ['list_id' => $shoppingList->id]) }}"
+                class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$allInCart || !$listHasItems ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105' }}"
+                @if(!$allInCart || !$listHasItems) onclick="return false;" @endif>
                 <x-custom-icon icon="cart-check" />
                 <span class="hidden sm:block">{{ __('finish_list') }}</span>
             </a>
-            <a href="{{ route('shopping_list.export', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
-                <x-custom-icon icon="download" /><span class="hidden sm:block">{{ __('export') }}</span>
+            <a href="{{ !$listHasItems ? '#' : route('shopping_list.export', ['list_id' => $shoppingList->id]) }}"
+                class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$listHasItems ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-orange-500 hover:bg-orange-600 text-white hover:scale-105' }}"
+                @if(!$listHasItems) onclick="return false;" @endif>
+                <x-custom-icon icon="download" />
+                <span class="hidden sm:block">{{ __('export') }}</span>
             </a>
             <a href="{{ route('shopping_list.create_item', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
                 <x-custom-icon icon="plus" /><span class="hidden sm:block">{{ __('new_item') }}</span>

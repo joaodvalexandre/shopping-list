@@ -8,6 +8,7 @@
         "php": "^8.1",
         "guzzlehttp/guzzle": "^7.2",
         "illuminate/support": "^10.48",
+        "jenssegers/agent": "^2.6",
         "laravel/breeze": "^1.29",
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.3",
