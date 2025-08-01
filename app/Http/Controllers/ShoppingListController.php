@@ -158,31 +158,26 @@ class ShoppingListController extends Controller
         return redirect()->route('shopping_list.show', $list_id);
     }
 
-    public function export(Request $request){
-        $agent = new Agent();
-        $isMobile = $agent->isMobile();
+    public function export(Request $request, $list_id)
+    {
+        $shoppingList = ShoppingList::with('items')->find($list_id);
 
-        if ($isMobile)
-            dd('Mobile FTW!!!');
-        else
-            dd('Desktop Filth!!!');
+        if (!$shoppingList) {
+            $this->notificationToggle('list_not_found_error', 'error');
+            return redirect()->route('shopping_list.show', $list_id);
+        }
 
+        $filename = "{$shoppingList->name}.md";
 
-        // // Your list data
-        // $items = ['Apples', 'Bananas', 'Milk'];
-        // $content = "# 🛒 Shopping List\n\n";
-        // foreach ($items as $item) {
-        //     $content .= "- [ ] $item\n";
-        // }
+        $content = "";
 
-        // if ($isMobile) {
-        //     return response($content)
-        //         ->header('Content-Type', 'text/markdown')
-        //         ->header('Content-Disposition', 'attachment; filename="shopping_list.md"');
-        // }
+        foreach ($shoppingList->items as $item) {
+            $content .= "- [ ] {$item->name}\n";
+        }
 
-        // // Fallback for desktop (e.g., show on screen)
-        // return view('shopping_list.preview', compact('items'));
+        return response($content)
+            ->header('Content-Type', 'text/markdown')
+            ->header("Content-Disposition", "attachment; filename={$filename}");
     }
 
     // Status Update
