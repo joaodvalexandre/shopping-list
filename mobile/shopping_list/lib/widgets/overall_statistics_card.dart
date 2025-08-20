@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class OverallStatisticsCard extends StatelessWidget {
   final Map<String, int> statistics;
@@ -11,24 +12,24 @@ class OverallStatisticsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.all(16.0),
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Shopping Lists Overview',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              AppLocalizations.of(context)?.shoppingLists ?? 'Overview',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: _StatisticItem(
-                    label: 'Lists',
+                    label: AppLocalizations.of(context)?.totalLists ?? 'Lists',
                     value: statistics['totalLists'] ?? 0,
                     color: Theme.of(context).colorScheme.primary,
                     icon: Icons.list_alt,
@@ -50,39 +51,18 @@ class OverallStatisticsCard extends StatelessWidget {
                     icon: Icons.check_circle,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
                 Expanded(
                   child: _StatisticItem(
-                    label: 'Total Items',
+                    label: AppLocalizations.of(context)?.totalItems ?? 'Items',
                     value: statistics['totalItems'] ?? 0,
                     color: Colors.orange,
                     icon: Icons.shopping_cart,
                   ),
                 ),
-                Expanded(
-                  child: _StatisticItem(
-                    label: 'Pending',
-                    value: statistics['pendingItems'] ?? 0,
-                    color: Colors.red,
-                    icon: Icons.pending,
-                  ),
-                ),
-                Expanded(
-                  child: _StatisticItem(
-                    label: 'Done',
-                    value: statistics['completedItems'] ?? 0,
-                    color: Colors.green,
-                    icon: Icons.done_all,
-                  ),
-                ),
               ],
             ),
             if (statistics['totalItems'] != null && statistics['totalItems']! > 0) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: statistics['completedItems']! / statistics['totalItems']!,
                 backgroundColor: Colors.grey[300],
@@ -90,11 +70,12 @@ class OverallStatisticsCard extends StatelessWidget {
                   Theme.of(context).colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
-                '${((statistics['completedItems']! / statistics['totalItems']!) * 100).toStringAsFixed(1)}% of all items completed',
+                '${((statistics['completedItems']! / statistics['totalItems']!) * 100).toStringAsFixed(1)}% completed',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey[600],
+                  fontSize: 10,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -126,12 +107,12 @@ class _StatisticItem extends StatelessWidget {
         Icon(
           icon,
           color: color,
-          size: 28,
+          size: 20,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Text(
           value.toString(),
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: color,
             fontWeight: FontWeight.bold,
           ),
@@ -140,6 +121,7 @@ class _StatisticItem extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Colors.grey[600],
+            fontSize: 10,
           ),
           textAlign: TextAlign.center,
         ),

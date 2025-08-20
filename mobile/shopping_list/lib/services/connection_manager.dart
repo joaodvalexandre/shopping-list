@@ -1,10 +1,16 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'web_api_service.dart';
 
-class ConnectionManager {
-  static final ConnectionManager _instance = ConnectionManager._internal();
-  factory ConnectionManager() => _instance;
+class ConnectionManager extends ChangeNotifier {
+  static ConnectionManager? _instance;
+
+  factory ConnectionManager() {
+    _instance ??= ConnectionManager._internal();
+    return _instance!;
+  }
+
   ConnectionManager._internal();
 
   final WebApiService _webApiService = WebApiService();
@@ -13,19 +19,18 @@ class ConnectionManager {
   bool _isConnected = false;
   bool _isWebappAvailable = false;
   Timer? _connectionCheckTimer;
-
-  // Stream controllers for connection status updates
-  final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
-  final StreamController<bool> _webappStatusController = StreamController<bool>.broadcast();
+  bool _isInitialized = false;
 
   // Getters
   bool get isConnected => _isConnected;
   bool get isWebappAvailable => _isWebappAvailable;
-  Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
-  Stream<bool> get webappStatusStream => _webappStatusController.stream;
 
   // Initialize connection monitoring
   Future<void> initialize() async {
+    if (_isInitialized) return;
+
+          // ConnectionManager initializing
+
     // Listen to connectivity changes
     _connectivity.onConnectivityChanged.listen(_onConnectivityChanged);
 
@@ -37,22 +42,27 @@ class ConnectionManager {
       const Duration(minutes: 2), // Check every 2 minutes
       (_) => _checkConnection(),
     );
+
+    _isInitialized = true;
+          // ConnectionManager initialized
   }
 
   // Handle connectivity changes
   void _onConnectivityChanged(ConnectivityResult result) {
+          // Connectivity changed
     final wasConnected = _isConnected;
     _isConnected = result != ConnectivityResult.none;
 
     if (wasConnected != _isConnected) {
-      _connectionStatusController.add(_isConnected);
+      // Connection status changed
+      notifyListeners();
 
       // If we just got connection, check webapp availability
       if (_isConnected) {
         _checkWebappAvailability();
       } else {
         _isWebappAvailable = false;
-        _webappStatusController.add(false);
+        notifyListeners();
       }
     }
   }
@@ -64,8 +74,11 @@ class ConnectionManager {
       final wasConnected = _isConnected;
       _isConnected = result != ConnectivityResult.none;
 
+      // Connection status updated
+
       if (wasConnected != _isConnected) {
-        _connectionStatusController.add(_isConnected);
+        // Connection status updated
+        notifyListeners();
       }
 
       // If connected, check webapp availability
@@ -73,24 +86,31 @@ class ConnectionManager {
         await _checkWebappAvailability();
       }
     } catch (e) {
+      // Error checking connection
       _isConnected = false;
-      _connectionStatusController.add(false);
+      notifyListeners();
     }
   }
 
   // Check if webapp is available
   Future<void> _checkWebappAvailability() async {
     try {
+      // Checking webapp availability
       final isAvailable = await _webApiService.testConnection();
       final wasAvailable = _isWebappAvailable;
       _isWebappAvailable = isAvailable;
 
+              // Webapp availability updated
+
       if (wasAvailable != _isWebappAvailable) {
-        _webappStatusController.add(_isWebappAvailable);
+                  // Webapp status updated
+        notifyListeners();
+        // Removed auto-import callback - user must manually choose when to sync
       }
     } catch (e) {
+      // Error checking webapp availability
       _isWebappAvailable = false;
-      _webappStatusController.add(false);
+      notifyListeners();
     }
   }
 
@@ -111,9 +131,9 @@ class ConnectionManager {
   }
 
   // Dispose resources
+  @override
   void dispose() {
     _connectionCheckTimer?.cancel();
-    _connectionStatusController.close();
-    _webappStatusController.close();
+    super.dispose();
   }
 }

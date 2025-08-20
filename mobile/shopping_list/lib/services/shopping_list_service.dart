@@ -9,38 +9,19 @@ class ShoppingListService extends ChangeNotifier {
   static const String _storageKey = 'shopping_list_items';
 
   List<ShoppingItem> get items => List.unmodifiable(_items);
-  
-  List<ShoppingItem> get pendingItems => 
+
+  List<ShoppingItem> get pendingItems =>
       _items.where((item) => !item.isCompleted).toList();
-  
-  List<ShoppingItem> get completedItems => 
+
+  List<ShoppingItem> get completedItems =>
       _items.where((item) => item.isCompleted).toList();
 
-  // Get items by category
-  List<ShoppingItem> getItemsByCategory(String? category) {
-    if (category == null) return _items;
-    return _items.where((item) => item.category == category).toList();
-  }
-
-  // Get unique categories
-  List<String> get categories {
-    final categories = _items
-        .where((item) => item.category != null)
-        .map((item) => item.category!)
-        .toSet()
-        .toList();
-    categories.sort();
-    return categories;
-  }
-
   // Add new item
-  Future<void> addItem(String name, String quantity, {String? category, String? notes}) async {
+  Future<void> addItem(String name, String quantity) async {
     final item = ShoppingItem(
       id: _generateId(),
       name: name.trim(),
       quantity: quantity.trim().isEmpty ? '1' : quantity.trim(),
-      category: category?.trim().isEmpty == true ? null : category?.trim(),
-      notes: notes?.trim().isEmpty == true ? null : notes?.trim(),
     );
 
     _items.add(item);
@@ -99,11 +80,11 @@ class ShoppingListService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final itemsJson = prefs.getStringList(_storageKey) ?? [];
-      
+
       _items = itemsJson
           .map((jsonString) => ShoppingItem.fromJson(jsonDecode(jsonString)))
           .toList();
-      
+
       // Sort items: pending first, then by creation date
       _items.sort((a, b) {
         if (a.isCompleted != b.isCompleted) {
@@ -111,7 +92,7 @@ class ShoppingListService extends ChangeNotifier {
         }
         return b.createdAt.compareTo(a.createdAt);
       });
-      
+
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -147,12 +128,10 @@ class ShoppingListService extends ChangeNotifier {
   // Search items
   List<ShoppingItem> searchItems(String query) {
     if (query.trim().isEmpty) return _items;
-    
+
     final lowercaseQuery = query.toLowerCase();
     return _items.where((item) {
-      return item.name.toLowerCase().contains(lowercaseQuery) ||
-             (item.category?.toLowerCase().contains(lowercaseQuery) ?? false) ||
-             (item.notes?.toLowerCase().contains(lowercaseQuery) ?? false);
+      return item.name.toLowerCase().contains(lowercaseQuery);
     }).toList();
   }
 
@@ -161,7 +140,7 @@ class ShoppingListService extends ChangeNotifier {
     final total = _items.length;
     final completed = _items.where((item) => item.isCompleted).length;
     final pending = total - completed;
-    
+
     return {
       'total': total,
       'completed': completed,

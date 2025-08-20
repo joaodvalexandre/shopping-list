@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class AddItemDialog extends StatefulWidget {
-  const AddItemDialog({super.key});
+  final String? initialName;
+  final String? initialQuantity;
+  final String title;
+
+  const AddItemDialog({
+    super.key,
+    this.initialName,
+    this.initialQuantity,
+    this.title = 'Add Shopping Item',
+  });
 
   @override
   State<AddItemDialog> createState() => _AddItemDialogState();
@@ -11,22 +21,31 @@ class _AddItemDialogState extends State<AddItemDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialName != null) {
+      _nameController.text = widget.initialName!;
+    }
+    if (widget.initialQuantity != null) {
+      _quantityController.text = widget.initialQuantity!;
+    }
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _quantityController.dispose();
-    _categoryController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add Shopping Item'),
+      title: Text(widget.title == 'Add Item'
+          ? (AppLocalizations.of(context)?.addItem ?? 'Add Item')
+          : (AppLocalizations.of(context)?.editItem ?? 'Edit Item')),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -35,57 +54,30 @@ class _AddItemDialogState extends State<AddItemDialog> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Item Name *',
-                  hintText: 'e.g., Milk, Bread, Apples',
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)?.itemName ?? 'Item Name',
+                  hintText: AppLocalizations.of(context)?.itemNameHint ?? 'e.g., Milk, Bread, Apples',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.shopping_cart_outlined),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Please enter an item name';
+                    return AppLocalizations.of(context)?.itemNameRequired ?? 'Please enter an item name';
                   }
                   return null;
                 },
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _quantityController,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity',
-                        hintText: '1',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 3,
-                    child: TextFormField(
-                      controller: _categoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        hintText: 'e.g., Dairy, Produce, Meat',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
               TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
-                  hintText: 'e.g., Organic, Brand preference',
+                controller: _quantityController,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)?.quantity ?? 'Quantity',
+                  hintText: AppLocalizations.of(context)?.quantityHint ?? '1',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.format_list_numbered),
                 ),
-                maxLines: 2,
+                keyboardType: TextInputType.number,
               ),
             ],
           ),
@@ -94,26 +86,22 @@ class _AddItemDialogState extends State<AddItemDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)?.cancel ?? 'Cancel'),
         ),
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.of(context).pop({
                 'name': _nameController.text.trim(),
-                'quantity': _quantityController.text.trim().isEmpty 
-                    ? '1' 
+                'quantity': _quantityController.text.trim().isEmpty
+                    ? '1'
                     : _quantityController.text.trim(),
-                'category': _categoryController.text.trim().isEmpty 
-                    ? null 
-                    : _categoryController.text.trim(),
-                'notes': _notesController.text.trim().isEmpty 
-                    ? null 
-                    : _notesController.text.trim(),
               });
             }
           },
-          child: const Text('Add'),
+          child: Text(widget.initialName != null
+              ? (AppLocalizations.of(context)?.update ?? 'Update')
+              : (AppLocalizations.of(context)?.add ?? 'Add')),
         ),
       ],
     );

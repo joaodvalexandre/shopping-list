@@ -1,43 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'l10n/app_localizations.dart';
 import 'models/shopping_list.dart';
 import 'services/shopping_lists_service.dart';
 import 'services/connection_manager.dart';
+import 'services/custom_locale_delegate.dart';
 import 'widgets/create_shopping_list_dialog.dart';
 import 'widgets/shopping_list_card.dart';
 import 'widgets/overall_statistics_card.dart';
 import 'widgets/sync_status_widget.dart';
+import 'screens/shopping_list_detail_screen.dart';
 
 void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => ShoppingListsService()),
-        Provider(create: (context) => ConnectionManager()),
+        ChangeNotifierProvider(create: (context) => LocaleService()),
+        ChangeNotifierProvider(create: (context) => ConnectionManager()),
+        ChangeNotifierProxyProvider<ConnectionManager, ShoppingListsService>(
+          create: (context) => ShoppingListsService(context.read<ConnectionManager>()),
+          update: (context, connectionManager, previous) =>
+              previous ?? ShoppingListsService(connectionManager),
+        ),
       ],
-      child: const ShoppingListApp(),
+      child: const MyApp(),
     ),
   );
 }
 
-class ShoppingListApp extends StatelessWidget {
-  const ShoppingListApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Shopping Lists',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      home: const ShoppingListsHomePage(),
+    return Consumer<LocaleService>(
+      builder: (context, localeService, child) {
+        return MaterialApp(
+          title: 'Smart Shopping',
+          localizationsDelegates: [
+            const CustomLocaleDelegate(),
+            ...AppLocalizations.localizationsDelegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: localeService.currentLocale,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.deepPurple,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+              elevation: 2,
+            ),
+            floatingActionButtonTheme: const FloatingActionButtonThemeData(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          home: const ShoppingListsHomePage(),
+        );
+      },
     );
   }
 }
+
+
 
 class ShoppingListsHomePage extends StatefulWidget {
   const ShoppingListsHomePage({super.key});
@@ -47,7 +76,6 @@ class ShoppingListsHomePage extends StatefulWidget {
 }
 
 class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
-  String _searchQuery = '';
 
   @override
   void initState() {
@@ -77,7 +105,10 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
 
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => const CreateShoppingListDialog(),
+      builder: (context) => CreateShoppingListDialog(
+        initialName: shoppingList.name,
+        isEditing: true,
+      ),
     );
 
     if (result != null && mounted) {
@@ -90,12 +121,12 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Shopping List'),
-        content: const Text('Are you sure you want to delete this shopping list? This action cannot be undone.'),
+        title: Text(AppLocalizations.of(context)?.deleteList ?? 'Delete Shopping List'),
+        content: Text(AppLocalizations.of(context)?.deleteListConfirm ?? 'Are you sure you want to delete this shopping list? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.cancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -103,7 +134,7 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)?.delete ?? 'Delete'),
           ),
         ],
       ),
@@ -114,28 +145,67 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
     }
   }
 
+  void _showLanguageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context)?.selectLanguage ?? 'Select Language'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Text('🇺🇸'),
+              title: Text(AppLocalizations.of(context)?.english ?? 'English'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _changeLanguage(const Locale('en'));
+              },
+            ),
+            ListTile(
+              leading: const Text('🇵🇹'),
+              title: Text(AppLocalizations.of(context)?.portuguese ?? 'Português'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _changeLanguage(const Locale('pt'));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _changeLanguage(Locale locale) {
+    context.read<LocaleService>().changeLanguage(locale);
+  }
+
   void _onShoppingListTap(ShoppingList shoppingList) {
-    // TODO: Navigate to shopping list detail page
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Opening ${shoppingList.name}...'),
-        duration: const Duration(seconds: 1),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShoppingListDetailScreen(
+          shoppingList: shoppingList,
+        ),
       ),
     );
   }
 
   List<ShoppingList> _getFilteredLists(ShoppingListsService service) {
-    if (_searchQuery.isEmpty) return service.shoppingLists;
-    return service.searchShoppingLists(_searchQuery);
+    return service.shoppingLists;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shopping Lists'),
+        title: const Text('Smart Shopping'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // Language change button
+          IconButton(
+            icon: const Icon(Icons.language),
+            onPressed: () => _showLanguageDialog(context),
+            tooltip: AppLocalizations.of(context)?.changeLanguage ?? 'Change Language',
+          ),
           Consumer<ConnectionManager>(
             builder: (context, connectionManager, child) {
               return IconButton(
@@ -150,7 +220,7 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
                 onPressed: () async {
                   await connectionManager.checkWebappAvailability();
                 },
-                tooltip: 'Check webapp connection',
+                tooltip: AppLocalizations.of(context)?.checkWebappConnection ?? 'Check webapp connection',
               );
             },
           ),
@@ -161,80 +231,84 @@ class _ShoppingListsHomePageState extends State<ShoppingListsHomePage> {
           final filteredLists = _getFilteredLists(service);
           final statistics = service.getOverallStatistics();
 
-          return Column(
-            children: [
+          return CustomScrollView(
+            slivers: [
               // Sync status widget
-              const SyncStatusWidget(),
+              SliverToBoxAdapter(
+                child: const SyncStatusWidget(),
+              ),
 
               // Statistics card
               if (statistics['totalLists']! > 0)
-                OverallStatisticsCard(statistics: statistics),
-
-              // Search bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search shopping lists...',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
+                SliverToBoxAdapter(
+                  child: OverallStatisticsCard(statistics: statistics),
                 ),
-              ),
 
-              const SizedBox(height: 16),
+
 
               // Shopping lists
-              Expanded(
-                child: filteredLists.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.list_alt_outlined,
-                              size: 64,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No shopping lists found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              service.shoppingLists.isEmpty
-                                  ? 'Create your first shopping list to get started!'
-                                  : 'Try adjusting your search',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
+              if (filteredLists.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.list_alt_outlined,
+                          size: 64,
+                          color: Colors.grey,
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: filteredLists.length,
-                        itemBuilder: (context, index) {
-                          final shoppingList = filteredLists[index];
-                          return ShoppingListCard(
+                        const SizedBox(height: 16),
+                                                            Text(
+                                      AppLocalizations.of(context)?.noShoppingLists ?? 'No shopping lists found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      AppLocalizations.of(context)?.noShoppingListsHint ?? 'Create your first shopping list to get started!',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: _showCreateShoppingListDialog,
+                                      icon: const Icon(Icons.add),
+                                      label: Text(AppLocalizations.of(context)?.create ?? 'Create'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.deepPurple,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final shoppingList = filteredLists[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: ShoppingListCard(
                             shoppingList: shoppingList,
                             onTap: () => _onShoppingListTap(shoppingList),
                             onDelete: () => _deleteShoppingList(shoppingList.id),
                             onEdit: () => _editShoppingList(shoppingList),
-                          );
-                        },
-                      ),
-              ),
+                          ),
+                        );
+                      },
+                      childCount: filteredLists.length,
+                    ),
+                  ),
+                ),
             ],
           );
         },

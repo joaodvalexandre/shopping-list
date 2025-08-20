@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class CreateShoppingListDialog extends StatefulWidget {
-  const CreateShoppingListDialog({super.key});
+  final String? initialName;
+  final bool isEditing;
+
+  const CreateShoppingListDialog({
+    super.key,
+    this.initialName,
+    this.isEditing = false,
+  });
 
   @override
   State<CreateShoppingListDialog> createState() => _CreateShoppingListDialogState();
@@ -9,7 +17,13 @@ class CreateShoppingListDialog extends StatefulWidget {
 
 class _CreateShoppingListDialogState extends State<CreateShoppingListDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName ?? '');
+  }
 
   @override
   void dispose() {
@@ -19,20 +33,26 @@ class _CreateShoppingListDialogState extends State<CreateShoppingListDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.isEditing;
+
     return AlertDialog(
-      title: const Text('Create New Shopping List'),
+      title: Text(
+        isEditing
+          ? (AppLocalizations.of(context)?.editList ?? 'Edit List')
+          : (AppLocalizations.of(context)?.createNewList ?? 'Create New List')
+      ),
       content: Form(
         key: _formKey,
         child: TextFormField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Shopping List Name *',
-            hintText: 'e.g., Groceries, Home Supplies, Party Shopping',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)?.listName ?? 'List Name',
+            hintText: AppLocalizations.of(context)?.listNameHint ?? 'e.g., Groceries, Home Supplies, Party Shopping',
+            border: const OutlineInputBorder(),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter a shopping list name';
+              return AppLocalizations.of(context)?.listNameRequired ?? 'Please enter a list name';
             }
             return null;
           },
@@ -43,7 +63,7 @@ class _CreateShoppingListDialogState extends State<CreateShoppingListDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)?.cancel ?? 'Cancel'),
         ),
         ElevatedButton(
           onPressed: () {
@@ -51,7 +71,11 @@ class _CreateShoppingListDialogState extends State<CreateShoppingListDialog> {
               Navigator.of(context).pop(_nameController.text.trim());
             }
           },
-          child: const Text('Create'),
+          child: Text(
+            isEditing
+              ? (AppLocalizations.of(context)?.update ?? 'Update')
+              : (AppLocalizations.of(context)?.create ?? 'Create')
+          ),
         ),
       ],
     );

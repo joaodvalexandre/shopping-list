@@ -8,6 +8,7 @@ class ShoppingList {
   List<ShoppingItem> items;
   String? webId; // ID from webapp for synchronization
   DateTime? lastSynced; // Last time synced with webapp
+  bool needsSync; // Whether this list needs to be synced with webapp
 
   ShoppingList({
     required this.id,
@@ -17,6 +18,7 @@ class ShoppingList {
     List<ShoppingItem>? items,
     this.webId,
     this.lastSynced,
+    this.needsSync = false,
   }) :
     createdAt = createdAt ?? DateTime.now(),
     items = items ?? [];
@@ -30,6 +32,7 @@ class ShoppingList {
       'items': items.map((item) => item.toJson()).toList(),
       'webId': webId,
       'lastSynced': lastSynced?.toIso8601String(),
+      'needsSync': needsSync,
     };
   }
 
@@ -48,6 +51,7 @@ class ShoppingList {
       lastSynced: json['lastSynced'] != null
           ? DateTime.parse(json['lastSynced'])
           : null,
+      needsSync: json['needsSync'] ?? false,
     );
   }
 
@@ -75,6 +79,7 @@ class ShoppingList {
           .toList() ?? [],
       webId: json['id']?.toString(),
       lastSynced: DateTime.now(),
+      needsSync: false, // Fresh from webapp, no sync needed
     );
   }
 
@@ -95,6 +100,7 @@ class ShoppingList {
     List<ShoppingItem>? items,
     String? webId,
     DateTime? lastSynced,
+    bool? needsSync,
   }) {
     return ShoppingList(
       id: id ?? this.id,
@@ -104,6 +110,7 @@ class ShoppingList {
       items: items ?? this.items,
       webId: webId ?? this.webId,
       lastSynced: lastSynced ?? this.lastSynced,
+      needsSync: needsSync ?? this.needsSync,
     );
   }
 
@@ -135,9 +142,4 @@ class ShoppingList {
   // Check if list is synced with webapp
   bool get isSynced => webId != null && lastSynced != null;
 
-  // Check if list needs sync (modified since last sync)
-  bool get needsSync {
-    if (!isSynced) return true;
-    return updatedAt != null && updatedAt!.isAfter(lastSynced!);
-  }
 }

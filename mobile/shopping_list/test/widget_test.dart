@@ -10,20 +10,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shopping_list/main.dart';
 import 'package:shopping_list/services/shopping_lists_service.dart';
+import 'package:shopping_list/services/connection_manager.dart';
 
 void main() {
-  testWidgets('Shopping lists app smoke test', (WidgetTester tester) async {
+    testWidgets('Shopping lists app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (context) => ShoppingListsService(),
-        child: const ShoppingListApp(),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (context) => ConnectionManager()),
+          ChangeNotifierProvider(create: (context) => ShoppingListsService(ConnectionManager())),
+        ],
+        child: const MyApp(),
       ),
     );
 
     // Verify that the app title is displayed
-    expect(find.text('Shopping Lists'), findsOneWidget);
-    
+    expect(find.text('Smart Shopping'), findsOneWidget);
+
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
   });
