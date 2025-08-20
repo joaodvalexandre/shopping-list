@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ShoppingListController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,4 +17,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
+});
+
+// Shopping List API Routes (no authentication required for mobile app)
+Route::prefix('shopping-lists')->group(function () {
+    Route::get('/health', [ShoppingListController::class, 'health']);
+    Route::get('/', [ShoppingListController::class, 'index']);
+    Route::post('/', [ShoppingListController::class, 'store']);
+    Route::put('/{id}', [ShoppingListController::class, 'update']);
+    Route::delete('/{id}', [ShoppingListController::class, 'destroy']);
+    Route::post('/sync', [ShoppingListController::class, 'sync']);
 });
