@@ -8,7 +8,6 @@
 
         <div class="flex flex-col gap-2">
             <!-- ID -->
-            <input name="id" value="{{$item->id}}" hidden></input>
             <!-- Name -->
             <x-input.input
                 name="name"

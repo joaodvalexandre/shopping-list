@@ -5,4 +5,9 @@
     <x-nav-link :href="route('shopping_list.index')" :active="request()->routeIs(['shopping_list*', 'item*'])" wire:navigate class="text-gray-900 dark:text-gray-100">
         {{ __('shopping_list') }}
     </x-nav-link>
+    @can('manage-family')
+        <x-nav-link :href="route('family.members.index')" :active="request()->routeIs('family*')" wire:navigate class="text-gray-900 dark:text-gray-100">
+            {{ __('family') }}
+        </x-nav-link>
+    @endcan
 </div>

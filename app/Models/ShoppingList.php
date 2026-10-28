@@ -2,11 +2,18 @@
 
 namespace App\Models;
 
+use App\Enums\ListAbility;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ShoppingList extends Model
 {
-    protected $fillable = ['name'];
+    use HasFactory;
+
+    protected $fillable = ['name', 'family_id', 'list_type_id', 'created_by'];
 
     /**
      * A shopping list has many items.
@@ -14,6 +21,47 @@ class ShoppingList extends Model
     public function items()
     {
         return $this->hasMany(Item::class, 'shopping_list_id');
+    }
+
+    public function family(): BelongsTo
+    {
+        return $this->belongsTo(Family::class);
+    }
+
+    public function listType(): BelongsTo
+    {
+        return $this->belongsTo(ListType::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Members who must not see this list at all.
+     */
+    public function hiddenFrom(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'shopping_list_hidden_from');
+    }
+
+    public function isHiddenFrom(User $user): bool
+    {
+        return $this->hiddenFrom()->where('users.id', $user->id)->exists();
+    }
+
+    /**
+     * The only way lists should be fetched for a signed-in user: same family,
+     * a list type they may view, and not hidden from them. Hiding wins over
+     * every role, admins included.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        return $query
+            ->where('shopping_lists.family_id', $user->family_id)
+            ->whereIn('shopping_lists.list_type_id', $user->listTypeIdsWith(ListAbility::View))
+            ->whereDoesntHave('hiddenFrom', fn (Builder $hidden) => $hidden->where('users.id', $user->id));
     }
 
     /**

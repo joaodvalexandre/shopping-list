@@ -30,21 +30,27 @@
             </a>
         </div>
         <div class="flex flex-row gap-2">
-            <a href="{{ !$allInCart || !$listHasItems ? '#' : route('shopping_list.mark_purchased', ['list_id' => $shoppingList->id]) }}"
-                class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$allInCart || !$listHasItems ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105' }}"
-                @if(!$allInCart || !$listHasItems) onclick="return false;" @endif>
-                <x-custom-icon icon="cart-check" />
-                <span class="hidden sm:block">{{ __('finish_list') }}</span>
-            </a>
+            @if($can['change_status'])
+                <form method="POST" action="{{ route('shopping_list.mark_purchased', ['list_id' => $shoppingList->id]) }}">
+                    @csrf
+                    <button type="submit" @disabled(!$allInCart || !$listHasItems)
+                        class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$allInCart || !$listHasItems ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105' }}">
+                        <x-custom-icon icon="cart-check" />
+                        <span class="hidden sm:block">{{ __('finish_list') }}</span>
+                    </button>
+                </form>
+            @endif
             <a href="{{ !$listHasItems ? '#' : route('shopping_list.export', ['list_id' => $shoppingList->id]) }}"
                 class="flex flex-row gap-2 font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform {{ !$listHasItems ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-orange-500 hover:bg-orange-600 text-white hover:scale-105' }}"
                 @if(!$listHasItems) onclick="return false;" @endif>
                 <x-custom-icon icon="download" />
                 <span class="hidden sm:block">{{ __('export') }}</span>
             </a>
-            <a href="{{ route('shopping_list.create_item', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
-                <x-custom-icon icon="plus" /><span class="hidden sm:block">{{ __('new_item') }}</span>
-            </a>
+            @if($can['add_items'])
+                <a href="{{ route('shopping_list.create_item', ['list_id' => $shoppingList->id]) }}" class="flex flex-row gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
+                    <x-custom-icon icon="plus" /><span class="hidden sm:block">{{ __('new_item') }}</span>
+                </a>
+            @endif
         </div>
     </div>
 
@@ -78,26 +84,36 @@
                                 <div class="flex flex-row gap-2">
                                     <!-- To buy -->
                                     @if($item->status->id == 1)
-                                        <a href="{{ route('shopping_list.add_cart', ['item_id' => $item->id]) }}"
-                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600">
-                                            <x-custom-icon icon="cart-arrow-down" />
-                                        </a>
-                                        <a href="{{ route('shopping_list.edit_item', ['item_id' => $item->id]) }}"
-                                            class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
-                                            <x-custom-icon icon="pencil" />
-                                        </a>
+                                        @if($can['change_status'])
+                                            <form method="POST" action="{{ route('shopping_list.add_cart', ['item_id' => $item->id]) }}" class="inline">
+                                                @csrf
+                                                <button type="submit" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" aria-label="{{ __('add_cart') }}">
+                                                    <x-custom-icon icon="cart-arrow-down" />
+                                                </button>
+                                            </form>
+                                        @endif
+                                        @if($can['edit_items'])
+                                            <a href="{{ route('shopping_list.edit_item', ['item_id' => $item->id]) }}"
+                                                class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
+                                                <x-custom-icon icon="pencil" />
+                                            </a>
+                                        @endif
                                     @endif
 
                                     <!-- In Cart -->
-                                    @if($item->status->id == 2)
-                                        <a href="{{ route('shopping_list.remove_cart', ['item_id' => $item->id]) }}"
-                                            class="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-600">
-                                            <x-custom-icon icon="cart-arrow-up" />
-                                        </a>
+                                    @if($item->status->id == 2 && $can['change_status'])
+                                        <form method="POST" action="{{ route('shopping_list.remove_cart', ['item_id' => $item->id]) }}" class="inline">
+                                            @csrf
+                                            <button type="submit" class="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-600" aria-label="{{ __('remove_cart') }}">
+                                                <x-custom-icon icon="cart-arrow-up" />
+                                            </button>
+                                        </form>
                                     @endif
 
                                     <!-- Delete -->
-                                    <x-delete-button action="{{ route('shopping_list.destroy_item', ['item_id' => $item->id]) }}" />
+                                    @if($can['edit_items'])
+                                        <x-delete-button action="{{ route('shopping_list.destroy_item', ['item_id' => $item->id]) }}" />
+                                    @endif
                                 </div>
                             </td>
                         </tr>
