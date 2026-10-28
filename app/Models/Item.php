@@ -2,15 +2,35 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Syncable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Item extends Model
 {
-    use HasFactory;
+    use HasFactory, Syncable;
 
-    protected $fillable = ['shopping_list_id', 'name', 'quantity', 'status_id'];
+    protected $fillable = [
+        'uuid', 'shopping_list_id', 'name', 'quantity', 'status_id',
+        'name_changed_at', 'quantity_changed_at', 'status_changed_at',
+    ];
+
+    /** Synced field => column holding when it last changed. */
+    protected array $syncedFields = [
+        'name' => 'name_changed_at',
+        'quantity' => 'quantity_changed_at',
+        'status_id' => 'status_changed_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'name_changed_at' => 'datetime',
+            'quantity_changed_at' => 'datetime',
+            'status_changed_at' => 'datetime',
+        ];
+    }
 
     /**
      * Items of lists the user may see (see ShoppingList::scopeVisibleTo).

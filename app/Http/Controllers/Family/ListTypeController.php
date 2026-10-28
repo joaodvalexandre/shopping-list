@@ -62,6 +62,9 @@ class ListTypeController extends Controller
             throw ValidationException::withMessages(['list_type' => __('list_type_in_use')]);
         }
 
+        // Deleted lists linger as tombstones for syncing devices and would
+        // block the foreign key; the type is going away, so they can too.
+        $type->shoppingLists()->onlyTrashed()->forceDelete();
         $type->delete();
         $this->notificationToggle('list_type_destroyed_success', 'success');
 

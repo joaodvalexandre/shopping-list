@@ -18,6 +18,7 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 
         <!-- Include Vite CSS and JS -->
+        <script>window.familyId = @json(auth()->user()?->family_id);</script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         <!-- Include Livewire CSS -->

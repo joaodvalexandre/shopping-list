@@ -107,6 +107,7 @@ class MemberController extends Controller
             $this->ensureNotLastAdmin($member);
         }
 
+        $member->tokens()->delete();
         $member->delete();
         $this->notificationToggle('member_destroyed_success', 'success');
 
@@ -118,8 +119,9 @@ class MemberController extends Controller
         $temporary = TemporaryPassword::generate();
         $member->update(['password' => $temporary, 'must_change_password' => true]);
 
-        // Invalidate any "remember me" cookie issued with the old password
+        // Sign the member out everywhere: "remember me" cookies and every phone
         $member->forceFill(['remember_token' => null])->save();
+        $member->tokens()->delete();
 
         return redirect()->route('family.members.index')
             ->with('temporary_password', ['email' => $member->email, 'password' => $temporary]);
