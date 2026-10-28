@@ -34,6 +34,8 @@
     "new_item":                 "New Item",
     "export":                   "Export List",
     "go_back":                  "Back",
+    "back_to_login":            "Back to log in",
+    "back_to_dashboard":        "Back to dashboard",
     "add_cart":                 "Add",
     "remove_cart":              "Remove",
     "purchase":                 "Purchase",

@@ -142,3 +142,16 @@ it('offers a tab for every active language', function () {
 
     $this->get('/admin/pages/create')->assertOk()->assertSee('Español')->assertSee('English')->assertSee('Português');
 });
+
+it('puts a back link at the top of a page: to the login for guests, to the dashboard when signed in', function () {
+    publishedPage();
+
+    $guest = $this->withSession(['locale' => 'en'])->get('/p/about')->assertOk();
+    $guest->assertSee('Back to log in')->assertSee(route('login'), false);
+    // it comes before the page's own title, not after the text
+    expect(strpos($guest->getContent(), 'Back to log in'))->toBeLessThan(strpos($guest->getContent(), '<h1'));
+
+    $f = makeFamily();
+    $this->actingAs($f['admin'])->withSession(['locale' => 'en'])->get('/p/about')
+        ->assertOk()->assertSee('Back to dashboard')->assertDontSee('Back to log in');
+});
