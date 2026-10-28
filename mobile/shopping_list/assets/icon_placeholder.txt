@@ -1,0 +1,22 @@
+SHOPPING CART ICON PLACEHOLDER
+================================
+
+This is a placeholder for the shopping cart icon PNG file.
+
+To create the actual icon:
+
+1. Create a 1024x1024 PNG image with:
+   - Deep purple background (#7C3AED)
+   - White shopping cart icon
+   - Rounded corners
+   - Optional: Orange circle with "3" for items
+
+2. Save it as: assets/shopping_cart_icon.png
+
+3. Run: flutter pub run flutter_launcher_icons:main
+
+4. Clean and rebuild: flutter clean && flutter pub get
+
+The app icon will change after generating the actual icon files!
+
+Current icon preview is available in the app's Icon Generator page.
