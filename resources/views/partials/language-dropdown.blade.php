@@ -1,6 +1,6 @@
 <div class="relative" x-data="{ open: false }">
     <button @click="open = !open" type="button"
-            class="flex items-center text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition duration-150 ease-in-out">
+            class="flex items-center text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-hidden transition duration-150 ease-in-out">
         <span class="mr-1">
             <img src="{{ asset('vendor/blade-flags/language-' . app()->getLocale() . '.svg') }}" class="w-6 h-6" alt="{{ app()->getLocale() }}"/>
         </span>
@@ -19,7 +19,7 @@
          x-transition:leave-start="transform opacity-100 scale-100"
          x-transition:leave-end="transform opacity-0 scale-95"
          @click.away="open = false"
-         class="absolute right-0 z-50 mt-2 origin-top-right rounded-md bg-white dark:bg-gray-700 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+         class="absolute right-0 z-50 mt-2 origin-top-right rounded-md bg-white dark:bg-gray-700 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden"
          role="menu" aria-orientation="vertical" aria-labelledby="language-dropdown">
         <x-dropdown-nav-link :href="route('switch-language', 'en')" :active="app()->getLocale() === 'en'" wire:navigate class="hover:bg-gray-200 dark:hover:bg-gray-500">
             <div class="flex items-center">

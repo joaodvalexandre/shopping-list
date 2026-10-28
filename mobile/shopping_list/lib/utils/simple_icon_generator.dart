@@ -15,7 +15,7 @@ class SimpleIconGenerator {
         borderRadius: BorderRadius.circular(size * 0.2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
+            color: color.withValues(alpha: 0.3),
             blurRadius: size * 0.1,
             offset: Offset(0, size * 0.05),
           ),
@@ -43,13 +43,13 @@ class SimpleIconGenerator {
           end: Alignment.bottomRight,
           colors: [
             color,
-            color.withOpacity(0.8),
+            color.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(size * 0.2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.4),
+            color: color.withValues(alpha: 0.4),
             blurRadius: size * 0.15,
             offset: Offset(0, size * 0.08),
           ),

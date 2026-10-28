@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 
 /// Helper class to export shopping cart icon
 class IconExportHelper {
@@ -17,13 +16,13 @@ class IconExportHelper {
           end: Alignment.bottomRight,
           colors: [
             color,
-            color.withOpacity(0.8),
+            color.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(size * 0.2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.4),
+            color: color.withValues(alpha: 0.4),
             blurRadius: size * 0.15,
             offset: Offset(0, size * 0.08),
           ),
@@ -80,7 +79,7 @@ class IconExportHelper {
         borderRadius: BorderRadius.circular(size * 0.2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
+            color: color.withValues(alpha: 0.3),
             blurRadius: size * 0.1,
             offset: Offset(0, size * 0.05),
           ),

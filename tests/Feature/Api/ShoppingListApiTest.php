@@ -7,6 +7,7 @@ use App\Models\ShoppingList;
 use App\Models\Item;
 use App\Models\Status;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 
 class ShoppingListApiTest extends TestCase
 {
@@ -22,7 +23,7 @@ class ShoppingListApiTest extends TestCase
         Status::create(['code' => 'purchased', 'name' => 'Purchased', 'color' => 'green']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_check_health_endpoint()
     {
         $response = $this->getJson('/api/shopping-lists/health');
@@ -31,7 +32,7 @@ class ShoppingListApiTest extends TestCase
                 ->assertJson(['status' => 'ok']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_fetch_all_shopping_lists()
     {
         $shoppingList = ShoppingList::create(['name' => 'Test List']);
@@ -68,7 +69,7 @@ class ShoppingListApiTest extends TestCase
                 ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_shopping_list()
     {
         $response = $this->postJson('/api/shopping-lists', [
@@ -86,7 +87,7 @@ class ShoppingListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_a_shopping_list()
     {
         $shoppingList = ShoppingList::create(['name' => 'Original Name']);
@@ -119,7 +120,7 @@ class ShoppingListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_delete_a_shopping_list()
     {
         $shoppingList = ShoppingList::create(['name' => 'To Delete']);
@@ -133,7 +134,7 @@ class ShoppingListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_sync_shopping_lists()
     {
         $response = $this->postJson('/api/shopping-lists/sync', [
@@ -174,7 +175,7 @@ class ShoppingListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_required_fields()
     {
         $response = $this->postJson('/api/shopping-lists', []);

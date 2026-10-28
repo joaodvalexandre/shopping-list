@@ -20,7 +20,7 @@ class ShoppingListDetailScreen extends StatefulWidget {
 }
 
 class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   void _showAddItemDialog() async {
     if (!mounted) return;

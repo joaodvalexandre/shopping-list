@@ -28,7 +28,7 @@
             <livewire:layout.navigation />
 
             <!-- Page Heading -->
-            <header class="bg-white dark:bg-gray-800 shadow text-black dark:text-white">
+            <header class="bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white">
                 <div class="max-w-7xl mx-auto py-4 px-6">
                     {{ __($route) }}
                 </div>
@@ -41,7 +41,7 @@
                         {{ $slot }}
                     </div>
                 @else
-                    <div class="flex flex-col gap-4 p-6 text-gray-900 dark:text-gray-100 max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-sm xl:rounded-lg">
+                    <div class="flex flex-col gap-4 p-6 text-gray-900 dark:text-gray-100 max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-xs xl:rounded-lg">
                         {{ $slot }}
                     </div>
                 @endif

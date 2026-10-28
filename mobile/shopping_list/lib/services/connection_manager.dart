@@ -47,11 +47,16 @@ class ConnectionManager extends ChangeNotifier {
           // ConnectionManager initialized
   }
 
+  // connectivity_plus reports every active transport (e.g. wifi + vpn)
+  bool _hasConnection(List<ConnectivityResult> results) {
+    return results.any((r) => r != ConnectivityResult.none);
+  }
+
   // Handle connectivity changes
-  void _onConnectivityChanged(ConnectivityResult result) {
+  void _onConnectivityChanged(List<ConnectivityResult> results) {
           // Connectivity changed
     final wasConnected = _isConnected;
-    _isConnected = result != ConnectivityResult.none;
+    _isConnected = _hasConnection(results);
 
     if (wasConnected != _isConnected) {
       // Connection status changed
@@ -70,9 +75,9 @@ class ConnectionManager extends ChangeNotifier {
   // Check internet connection
   Future<void> _checkConnection() async {
     try {
-      final result = await _connectivity.checkConnectivity();
+      final results = await _connectivity.checkConnectivity();
       final wasConnected = _isConnected;
-      _isConnected = result != ConnectivityResult.none;
+      _isConnected = _hasConnection(results);
 
       // Connection status updated
 

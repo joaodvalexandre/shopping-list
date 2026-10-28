@@ -17,7 +17,7 @@
                 localStorage.setItem('theme', 'light');
             }
         "
-        class="relative flex items-center w-16 h-8 rounded-full bg-gray-300 dark:bg-gray-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        class="relative flex items-center w-16 h-8 rounded-full bg-gray-300 dark:bg-gray-600 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
         <!-- Slider with Icon -->
         <span
             :class="{ 'translate-x-8': darkMode, 'translate-x-0': !darkMode }"
