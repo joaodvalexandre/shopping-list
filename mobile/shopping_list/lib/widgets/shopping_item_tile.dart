@@ -49,7 +49,7 @@ class ShoppingItemTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(item).withOpacity(0.1),
+                    color: _getStatusColor(item).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _getStatusColor(item)),
                   ),
@@ -83,7 +83,7 @@ class ShoppingItemTile extends StatelessWidget {
                 onPressed: onTap,
                 tooltip: _getActionTooltip(context, item),
                 style: IconButton.styleFrom(
-                  backgroundColor: _getActionColor(item).withOpacity(0.1),
+                  backgroundColor: _getActionColor(item).withValues(alpha: 0.1),
                   foregroundColor: _getActionColor(item),
                   padding: const EdgeInsets.all(4),
                 ),
@@ -95,7 +95,7 @@ class ShoppingItemTile extends StatelessWidget {
                 onPressed: onEdit,
                 tooltip: AppLocalizations.of(context)?.editItem ?? 'Edit item',
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  backgroundColor: Colors.blue.withValues(alpha: 0.1),
                   foregroundColor: Colors.blue,
                   padding: const EdgeInsets.all(4),
                 ),
@@ -107,7 +107,7 @@ class ShoppingItemTile extends StatelessWidget {
                 onPressed: onDelete,
                 tooltip: AppLocalizations.of(context)?.deleteItem ?? 'Delete item',
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.red.withOpacity(0.1),
+                  backgroundColor: Colors.red.withValues(alpha: 0.1),
                   foregroundColor: Colors.red,
                   padding: const EdgeInsets.all(4),
                 ),

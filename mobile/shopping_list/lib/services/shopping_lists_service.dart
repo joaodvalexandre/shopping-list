@@ -8,7 +8,7 @@ import 'web_api_service.dart';
 import 'connection_manager.dart';
 
 class ShoppingListsService extends ChangeNotifier {
-  List<ShoppingList> _shoppingLists = [];
+  final List<ShoppingList> _shoppingLists = [];
   static const String _storageKey = 'shopping_lists';
   static const String _offlineChangesKey = 'offline_changes';
 
