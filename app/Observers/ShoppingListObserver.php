@@ -2,23 +2,28 @@
 
 namespace App\Observers;
 
-use App\Models\ShoppingList;
 use App\Events\ModelChanged;
+use App\Models\ShoppingList;
 
 class ShoppingListObserver
 {
-    public function created(ShoppingList $list)
+    public function created(ShoppingList $list): void
     {
-        broadcast(new ModelChanged('shopping_list', 'created', $list->toArray()));
+        $this->announce($list, 'created');
     }
 
-    public function updated(ShoppingList $list)
+    public function updated(ShoppingList $list): void
     {
-        broadcast(new ModelChanged('shopping_list', 'updated', $list->toArray()));
+        $this->announce($list, 'updated');
     }
 
-    public function deleted(ShoppingList $list)
+    public function deleted(ShoppingList $list): void
     {
-        broadcast(new ModelChanged('shopping_list', 'deleted', ['id' => $list->id]));
+        $this->announce($list, 'deleted');
+    }
+
+    private function announce(ShoppingList $list, string $action): void
+    {
+        broadcast(new ModelChanged('shopping_list', $action, $list->id, $list->family_id));
     }
 }

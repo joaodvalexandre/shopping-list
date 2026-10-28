@@ -1,14 +1,15 @@
 import './bootstrap';
 import Iconify from '@iconify/iconify';
 
-// Echo-based real-time listener
-window.Echo.channel('models')
-    .listen('ModelChanged', (event) => {
-        const { model } = event;
-
-        if (['item', 'shopping_list'].includes(model)) {
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        }
-    });
+// Realtime: reload when something in the family's lists changes.
+// The channel is private (authorised per family) and carries only ids.
+if (window.familyId) {
+    window.Echo.private(`family.${window.familyId}`)
+        .listen('ModelChanged', (event) => {
+            if (['item', 'shopping_list'].includes(event.model)) {
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+        });
+}

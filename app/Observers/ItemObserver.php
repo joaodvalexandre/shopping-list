@@ -2,23 +2,33 @@
 
 namespace App\Observers;
 
-use App\Models\Item;
 use App\Events\ModelChanged;
+use App\Models\Item;
 
 class ItemObserver
 {
-    public function created(Item $item)
+    public function created(Item $item): void
     {
-        broadcast(new ModelChanged('item', 'created', $item->toArray()));
+        $this->announce($item, 'created');
     }
 
-    public function updated(Item $item)
+    public function updated(Item $item): void
     {
-        broadcast(new ModelChanged('item', 'updated', $item->toArray()));
+        $this->announce($item, 'updated');
     }
 
-    public function deleted(Item $item)
+    public function deleted(Item $item): void
     {
-        broadcast(new ModelChanged('item', 'deleted', ['id' => $item->id]));
+        $this->announce($item, 'deleted');
+    }
+
+    private function announce(Item $item, string $action): void
+    {
+        // The list may be soft-deleted already, hence withTrashed()
+        $familyId = $item->shoppingList()->withTrashed()->value('family_id');
+
+        if ($familyId !== null) {
+            broadcast(new ModelChanged('item', $action, $item->id, (int) $familyId));
+        }
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ListAbility;
+use App\Models\Concerns\Syncable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,9 +12,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ShoppingList extends Model
 {
-    use HasFactory;
+    use HasFactory, Syncable;
 
-    protected $fillable = ['name', 'family_id', 'list_type_id', 'created_by'];
+    protected $fillable = ['uuid', 'name', 'name_changed_at', 'family_id', 'list_type_id', 'created_by'];
+
+    /** Synced field => column holding when it last changed. */
+    protected array $syncedFields = ['name' => 'name_changed_at'];
+
+    protected function casts(): array
+    {
+        return ['name_changed_at' => 'datetime'];
+    }
 
     /**
      * A shopping list has many items.

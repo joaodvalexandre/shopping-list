@@ -25,7 +25,7 @@ class ShoppingListPolicy
      */
     public function create(User $user, ListType $type): bool
     {
-        return $type->family_id === $user->family_id
+        return (int) $type->family_id === (int) $user->family_id
             && $user->canOnListType(ListAbility::ManageLists, $type);
     }
 
@@ -56,7 +56,7 @@ class ShoppingListPolicy
 
     private function allows(User $user, ShoppingList $list, ListAbility $ability): bool
     {
-        return $list->family_id === $user->family_id
+        return (int) $list->family_id === (int) $user->family_id
             && ! $list->isHiddenFrom($user)
             && $user->canOnListType($ability, $list->list_type_id);
     }

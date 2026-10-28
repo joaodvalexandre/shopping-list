@@ -30,7 +30,7 @@ Since we can't generate PNG files directly from Flutter code, here's how to crea
 2. **Save it as** `assets/shopping_cart_icon.png`
 3. **Run this command:**
    ```bash
-   flutter pub run flutter_launcher_icons:main
+   dart run flutter_launcher_icons
    ```
 4. **Clean and rebuild:**
    ```bash

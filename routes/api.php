@@ -1,33 +1,38 @@
 <?php
 
-use App\Http\Controllers\Api\ShoppingListController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\SyncController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| Mobile API v1
 |--------------------------------------------------------------------------
 |
-| Everything except the health check requires a Sanctum token. The mobile
-| API is being reworked (token login per device, family-scoped data and
-| delta sync); until then the data routes are closed on purpose, because
-| they used to expose every list without authentication.
+| Token (Sanctum) per device. A member on a temporary password only gets a
+| token able to change the password; every other route needs the full
+| "sync" ability. All data is scoped to the user's family and obeys the
+| same permissions and hidden lists as the web app.
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+Route::prefix('v1')->group(function () {
+    Route::get('health', fn () => response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]));
 
-Route::prefix('shopping-lists')->group(function () {
-    Route::get('/health', [ShoppingListController::class, 'health']);
+    Route::post('auth/login', [AuthController::class, 'login']);
 
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/', [ShoppingListController::class, 'index']);
-        Route::post('/', [ShoppingListController::class, 'store']);
-        Route::put('/{id}', [ShoppingListController::class, 'update']);
-        Route::delete('/{id}', [ShoppingListController::class, 'destroy']);
-        Route::post('/sync', [ShoppingListController::class, 'sync']);
+    // Reachable with either token (needed to finish a first login)
+    Route::middleware(['auth:sanctum', 'ability:sync,change-password'])->group(function () {
+        Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::put('me/password', [AuthController::class, 'changePassword']);
+    });
+
+    Route::middleware(['auth:sanctum', 'abilities:sync'])->group(function () {
+        Route::get('me', [MeController::class, 'show']);
+        Route::get('me/devices', [MeController::class, 'devices']);
+        Route::delete('me/devices/{device}', [MeController::class, 'revokeDevice']);
+
+        Route::post('sync', SyncController::class);
     });
 });

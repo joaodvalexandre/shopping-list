@@ -22,7 +22,7 @@ echo ""
 
 # Generate icons using flutter_launcher_icons
 echo "🚀 Generating app icons..."
-flutter pub run flutter_launcher_icons:main
+dart run flutter_launcher_icons
 
 if [ $? -eq 0 ]; then
     echo "✅ Icons generated successfully!"

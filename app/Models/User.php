@@ -75,7 +75,7 @@ class User extends Authenticatable
     {
         $typeId = $type instanceof ListType ? $type->id : $type;
 
-        if ($type instanceof ListType && $type->family_id !== $this->family_id) {
+        if ($type instanceof ListType && (int) $type->family_id !== (int) $this->family_id) {
             return false;
         }
 

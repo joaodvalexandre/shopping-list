@@ -22,7 +22,7 @@ echo.
 
 REM Generate icons using flutter_launcher_icons
 echo 🚀 Generating app icons...
-flutter pub run flutter_launcher_icons:main
+dart run flutter_launcher_icons
 
 if %errorlevel% equ 0 (
     echo ✅ Icons generated successfully!

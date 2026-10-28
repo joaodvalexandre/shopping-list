@@ -51,7 +51,7 @@ To complete the app icon update, you need to create a shopping cart icon PNG fil
 
 2. **Generate all icon sizes:**
    ```bash
-   flutter pub run flutter_launcher_icons:main
+   dart run flutter_launcher_icons
    ```
 
 3. **Clean and rebuild:**
