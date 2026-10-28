@@ -1,68 +1,91 @@
-# Shopping List Mobile App
+# Shopping List - mobile app
 
-A Flutter mobile application for managing shopping lists with web synchronization capabilities.
+Flutter companion app for the Shopping List web app (see the [project README](../../README.md)).
 
-## Features
+> **Status: being reworked.** Today the app is a standalone, local-only shopping list. Its old web-sync code talks to API endpoints that were **removed** (they served every family's data without authentication), so **sync with the web app is currently disabled**. The replacement API is ready and documented; the app is the next piece of work. See [What is planned](#what-is-planned).
 
-- **Local Storage**: Store shopping lists locally using SharedPreferences
-- **Web Synchronization**: Sync with Laravel webapp when connected
-- **Offline Support**: Full functionality without internet connection
-- **Real-time Status**: Connection and sync status indicators
-- **Import/Export**: Import lists from webapp and sync local changes
+## What works today
 
-## Web Synchronization
+- Shopping lists and items, stored on the device (`shared_preferences`)
+- Add / edit / delete lists and items; move items to the cart and mark them purchased
+- Progress statistics per list and overall
+- Portuguese and English
+- Light and dark appearance
 
-The app automatically detects when it's connected to the internet and when the Laravel webapp is available. It provides:
+## What is planned
 
-- **Connection Status**: Shows internet connectivity
-- **Webapp Status**: Shows if the webapp is reachable
-- **Sync Status**: Shows how many lists need synchronization
-- **Import Button**: Download lists from the webapp
-- **Sync Button**: Upload local changes to the webapp
+The goal is for the app to **behave and look like the web app**, not to be a separate product.
 
-## API Configuration
+**Sign-in and sync (API v1)** - [reference](../../docs/api.md)
+- Sign in with the same email and password as the web app; one token per device, revocable from the web
+- First login with a temporary password asks the member to choose their own
+- A local database plus an outbox of offline changes, sent and received with the single `POST /api/v1/sync` call
+- Conflicts resolved per field, last write wins; deletions propagate as tombstones
 
-The app is configured to connect to the Laravel webapp at:
+**Same rules as the web**
+- Buttons appear only if the member holds the permission (add items, edit items, cart & purchase, manage lists), per list type, using the `permissions` the API returns
+- Lists hidden from the member simply do not exist on the phone
+- Admins and members who manage a list type can choose who a list is hidden from
+- List types come from the family
 
-- **Current Configuration**: `http://raspfofs/api`
-- **Customization**: Update the URL in `web_api_service.dart` if needed
+**Same look as the web**
+- Same layout, colours, spacing, icons and wording as the Laravel views, in light and dark
 
-## API Endpoints
+**Nearby sync (Android)**
+- Phones of the same family find each other (Android Nearby Connections) and exchange changes directly, using the same sync protocol and a server-issued family key, so a stranger's phone cannot join. Needs one prior sync with the server to obtain the key.
 
-The Laravel webapp provides these endpoints:
+## Development
 
-- `GET /api/shopping-lists/health` - Health check
-- `GET /api/shopping-lists` - Fetch all lists
-- `POST /api/shopping-lists` - Create new list
-- `PUT /api/shopping-lists/{id}` - Update list
-- `DELETE /api/shopping-lists/{id}` - Delete list
-- `POST /api/shopping-lists/sync` - Sync multiple lists
+Requirements: Flutter 3.47+ (Dart 3.8+).
 
-## Data Flow
+```bash
+flutter pub get          # install dependencies
+flutter analyze          # static analysis
+flutter test             # tests
+flutter run              # run on a connected device or emulator
+```
 
-1. **Local Creation**: Lists are created locally first
-2. **Auto-sync**: If webapp is available, lists are automatically synced
-3. **Conflict Resolution**: Local changes take precedence during sync
-4. **Bidirectional Sync**: Changes flow both ways between mobile and web
+Build:
 
-## Offline Mode
+```bash
+flutter build apk --release
+```
 
-When offline:
-- All functionality works locally
-- Changes are queued for sync when connection is restored
-- No data loss occurs
+Android builds need the SDK licences accepted once: `flutter doctor --android-licenses`.
 
-## Getting Started
+### Known issues
 
-1. Ensure the Laravel webapp is running at `http://raspfofs/dashboard`
-2. The API endpoints should be accessible at `http://raspfofs/dashboard/api/*`
-3. Run the Flutter app
-4. The app will automatically detect the webapp connection
-5. Use the sync buttons to import/export data
+- `test/widget_test.dart` fails: it builds `MyApp` without the `LocaleService` provider that `main.dart` now requires.
+- `lib/services/web_api_service.dart` and `connection_manager.dart` still target the removed API and will be replaced by the v1 client.
 
-## Dependencies
+### Project structure
 
-- `http`: For API communication
-- `connectivity_plus`: For network status detection
-- `shared_preferences`: For local storage
-- `provider`: For state management
+```
+lib/
+├── main.dart                  App entry point, providers
+├── models/                    Shopping list and item models
+├── services/
+│   ├── shopping_lists_service.dart   Local data and business logic
+│   ├── web_api_service.dart          Legacy API client (to be replaced by the v1 client)
+│   ├── connection_manager.dart       Connectivity monitoring
+│   └── custom_locale_delegate.dart   Language handling
+├── screens/                   List detail screen
+├── widgets/                   Cards, dialogs, item tiles, sync status
+├── l10n/                      pt / en translations (.arb)
+├── pages/ , utils/            App-icon generator (development tool, see ICON_UPDATE_INSTRUCTIONS.md)
+```
+
+### Dependencies
+
+| Package | Used for |
+|---|---|
+| `provider` | State management |
+| `shared_preferences` | Local storage (until the local database lands) |
+| `http` | API calls |
+| `connectivity_plus` | Detecting connectivity (returns a *list* of active connections since v6) |
+| `intl`, `flutter_localizations` | Translations |
+| `flutter_launcher_icons` (dev) | Generating the launcher icon |
+
+### App icon
+
+See [ICON_UPDATE_INSTRUCTIONS.md](ICON_UPDATE_INSTRUCTIONS.md).

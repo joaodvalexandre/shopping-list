@@ -13,7 +13,7 @@ To create the actual icon:
 
 2. Save it as: assets/shopping_cart_icon.png
 
-3. Run: flutter pub run flutter_launcher_icons:main
+3. Run: dart run flutter_launcher_icons
 
 4. Clean and rebuild: flutter clean && flutter pub get
 

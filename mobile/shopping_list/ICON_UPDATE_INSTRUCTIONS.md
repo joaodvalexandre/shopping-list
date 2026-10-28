@@ -14,7 +14,7 @@ The app icon has been updated to use a shopping cart design. Here are the steps 
 2. **Create icon configuration in pubspec.yaml:**
    ```yaml
    dev_dependencies:
-     flutter_launcher_icons: ^0.13.1
+     flutter_launcher_icons: ^0.14.4
 
    flutter_launcher_icons:
      android: "launcher_icon"
@@ -31,7 +31,7 @@ The app icon has been updated to use a shopping cart design. Here are the steps 
 3. **Generate icons:**
    ```bash
    flutter pub get
-   flutter pub run flutter_launcher_icons:main
+   dart run flutter_launcher_icons
    ```
 
 ### **Option 2: Manual Icon Replacement**
