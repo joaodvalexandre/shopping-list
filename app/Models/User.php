@@ -42,6 +42,12 @@ class User extends Authenticatable
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Device tokens are not covered by database foreign keys
+        static::deleting(fn (User $user) => $user->tokens()->delete());
+    }
+
     /** Per-request cache of permission rows, keyed by list type id. */
     private ?Collection $permissionCache = null;
 
@@ -65,6 +71,16 @@ class User extends Authenticatable
     public function isFamilyAdmin(): bool
     {
         return $this->role === FamilyRole::Admin;
+    }
+
+    /** True if this user is the only admin their family has. */
+    public function isLastFamilyAdmin(): bool
+    {
+        return $this->isFamilyAdmin()
+            && ! static::where('family_id', $this->family_id)
+                ->where('role', FamilyRole::Admin->value)
+                ->where('id', '!=', $this->id)
+                ->exists();
     }
 
     /**

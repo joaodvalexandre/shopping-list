@@ -22,8 +22,8 @@
                 <label for="locale" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ __('language') }}</label>
                 <select name="locale" id="locale"
                         class="w-full px-4 py-2 text-sm rounded-lg shadow-xs border border-gray-300 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
-                    @foreach(['en', 'pt'] as $code)
-                        <option value="{{ $code }}" @selected(old('locale', $user->locale ?? app()->getLocale()) === $code)>{{ __($code) }}</option>
+                    @foreach(App\Models\Language::active() as $language)
+                        <option value="{{ $language['code'] }}" @selected(old('locale', $user->locale ?? app()->getLocale()) === $language['code'])>{{ $language['native_name'] }}</option>
                     @endforeach
                 </select>
             </div>

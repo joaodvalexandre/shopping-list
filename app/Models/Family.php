@@ -12,6 +12,13 @@ class Family extends Model
 
     protected $fillable = ['name'];
 
+    protected static function booted(): void
+    {
+        // Deleting a family removes its members in the database (cascade), which
+        // skips model events - so sign their devices out here first.
+        static::deleting(fn (Family $family) => $family->users->each(fn (User $user) => $user->tokens()->delete()));
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

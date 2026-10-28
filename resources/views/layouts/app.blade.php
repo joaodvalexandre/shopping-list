@@ -47,6 +47,8 @@
                     </div>
                 @endif
             </main>
+
+            @include('partials.footer-pages')
         </div>
         @livewireScripts
         <livewire:layout.notification-component />

@@ -8,6 +8,7 @@ use App\Models\ShoppingList;
 use App\Models\User;
 use App\Observers\ItemObserver;
 use App\Observers\ShoppingListObserver;
+use App\Support\Translations\DatabaseTranslationLoader;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -24,7 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Texts edited in the backoffice override the ones shipped in resources/lang
+        $this->app->extend('translation.loader', fn ($loader) => new DatabaseTranslationLoader($loader));
     }
 
     /**

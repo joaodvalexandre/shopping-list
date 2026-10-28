@@ -380,3 +380,6 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+# Filament assets published by `composer install` (filament:upgrade)
+public/fonts/filament/

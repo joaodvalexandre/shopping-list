@@ -92,3 +92,9 @@ it('applies the language saved on the account', function () {
 
     expect(app()->getLocale())->toBe('en');
 });
+
+it('loads Livewire (and Alpine) on guest pages, so the language menu and theme toggle work', function () {
+    foreach (['/login'] as $url) {
+        $this->get($url)->assertOk()->assertSee('livewire', false)->assertSee('[x-cloak]', false);
+    }
+});

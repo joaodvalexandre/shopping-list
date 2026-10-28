@@ -8,11 +8,12 @@ A shared shopping list for families. A web app (Laravel + Livewire) where each f
 - A list can be **hidden from specific members** (the birthday person never sees the party list).
 - Portuguese and English.
 
-> **Status:** work in progress. The web app, accounts, permissions and the mobile API (v1) are done. The mobile app is still being reworked to use the API, and the admin backoffice is not built yet. See [Roadmap](#roadmap).
+> **Status:** work in progress. The web app, accounts, permissions, the mobile API (v1) and the admin backoffice are done. The mobile app is still being reworked to use the API. See [Roadmap](#roadmap).
 
 ## Contents
 
 - [How it works](#how-it-works)
+- [Backoffice](#backoffice)
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Day-to-day development](#day-to-day-development)
@@ -29,17 +30,11 @@ A shared shopping list for families. A web app (Laravel + Livewire) where each f
 
 | Role | Can do |
 |---|---|
-| **App admin** (you, via the backoffice - not built yet) | Create families and their first admin |
+| **App admin** (you, in the [backoffice](#backoffice)) | Create and delete families, manage every member, languages, texts and pages |
 | **Family admin** | Everything inside their own family: manage members, list types, permissions, and every list. Can promote any member to admin |
 | **Member** | Only what their permissions allow |
 
-Until the backoffice exists, create a family from the command line:
-
-```bash
-php artisan family:create "Silva" "Joana Silva" joana@example.com
-```
-
-It prints a **one-time temporary password**. The admin must choose their own password on first login. The same applies to every member a family admin adds (from the **Family** menu): a temporary password is shown once, and the member must replace it on first login.
+Families are created in the backoffice (or from the command line: `php artisan family:create "Silva" "Joana Silva" joana@example.com`). Either way a **one-time temporary password** is shown for the family's first admin, who must choose their own on first login. The same applies to every member a family admin adds (from the **Family** menu): a temporary password is shown once, and the member must replace it on first login.
 
 ### Permissions
 
@@ -69,6 +64,33 @@ All access goes through one place, so the web app and the API always agree:
 - `ShoppingListPolicy` answers what a user may do with a list they can see.
 - Anything outside a user's reach answers **404**, never 403, so records cannot be probed.
 
+## Backoffice
+
+For the app owner, at **`/admin`** (built with [Filament](https://filamentphp.com)). It is a separate world from the family app: its administrators live in their own table (`admins`) and use their own login, so **no family account, whatever its role, can ever sign in to it**.
+
+Create the first administrator once:
+
+```bash
+php artisan admin:create "Your Name" you@example.com
+# asks for a password (12+ characters)
+```
+
+What you can do there:
+
+| Section | |
+|---|---|
+| **Dashboard** | Families, members (and how many are still waiting for their first login), lists, items, latest families |
+| **Families** | Create a family together with its first admin (a temporary password is shown once). Rename, delete (removes the family with everything in it). Each family's page lists its members |
+| **Members** | Every member of every family: search, filter by family/role/status. Edit name, email and role (promote to admin), **reset password** (new temporary password, signed out everywhere), **sign out everywhere**, delete. A family can never be left without an admin |
+| **Pages** | Simple content pages (privacy, about, help...) with a title and rich text **per language**, shown at `/p/<address>`. Drafts are hidden; published pages can be linked in the site footer |
+| **Languages** | Switch languages on/off, choose the default, add new ones (Spanish, French...). Whatever is switched on appears in the language menu and in members' settings. The default and English (the fallback) cannot be deleted |
+| **Texts** | Every text of the app, per language. The shipped text is shown next to a box where you type your own version; blank goes back to the default. Placeholders such as `:seconds` must be kept. Use **Sync texts** after adding a language or new texts to the code |
+| **Administrators** | Add and remove people who can sign in to the backoffice; reset someone's two-factor setup if they lose their authenticator |
+
+**Two-factor sign-in** (authenticator app, with recovery codes) is **required in production** and optional while developing. Each administrator sets it up from their profile.
+
+How the texts work: the texts that ship with the app live in `resources/lang/*.json` and are the defaults. What you type in **Texts** is stored in the database and laid over them, for that language only. Only texts that exist in those files can be overridden, so framework messages (like validation errors) are never affected.
+
 ## Requirements
 
 - PHP **8.3+** (developed on 8.5) with the extensions `mbstring`, `openssl`, `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `curl`, `fileinfo`, `intl`, `zip`, `gd`, `exif`
@@ -91,8 +113,8 @@ php artisan key:generate
 Create an empty database (default name `shopping_list`), set `DB_*` in `.env`, then:
 
 ```bash
-php artisan migrate --seed          # tables + the three item statuses
-php artisan family:create "My family" "My Name" me@example.com
+php artisan migrate --seed          # tables, item statuses, languages and their texts
+php artisan admin:create            # your backoffice login (asks for name, email, password)
 npm install
 npm run build
 ```
@@ -103,7 +125,7 @@ Serve it with Laragon (it picks up the project folder) or:
 php artisan serve
 ```
 
-Open the site and sign in with the email and temporary password printed by `family:create`.
+Then sign in to **`/admin`**, create a family (a temporary password is shown once), and sign in to the site with it. After pulling new changes, run `composer install` and `npm run build` again (the backoffice's own scripts are republished automatically by Composer).
 
 ## Day-to-day development
 
@@ -119,7 +141,8 @@ Useful commands:
 
 | Command | Purpose |
 |---|---|
-| `php artisan family:create "Family" "Admin name" admin@email` | New family with its first admin |
+| `php artisan admin:create` | New backoffice administrator |
+| `php artisan family:create "Family" "Admin name" admin@email` | New family with its first admin (the backoffice does this too) |
 | `php artisan route:list` | All routes |
 | `vendor/bin/pint` | Code style |
 
@@ -129,7 +152,7 @@ Everything is in `.env` (see `.env.example`). The ones worth knowing:
 
 | Variable | Meaning |
 |---|---|
-| `APP_LOCALE` / `APP_FALLBACK_LOCALE` | Default language (`pt`) and fallback (`en`). Each member can choose their own in **Settings** |
+| `APP_LOCALE` / `APP_FALLBACK_LOCALE` | Language used before the database is set up (`pt`), and the fallback for any missing text (`en`). Which languages are offered, and the default, are managed in the backoffice. Each member can choose their own in **Settings** |
 | `BROADCAST_CONNECTION` | `log` (default) or `pusher`. With Pusher, open browsers of a family refresh when someone changes a list |
 | `PUSHER_*`, `VITE_PUSHER_*` | Pusher credentials, only for realtime refresh. The channel is private per family and carries only ids, never content |
 | `SANCTUM_EXPIRATION` | Minutes a mobile device token stays valid (default 180 days) |
@@ -148,6 +171,9 @@ The suite uses Pest and in-memory SQLite. It focuses on what must never break:
 - every permission works on its own (a member who can add items cannot edit them, and so on)
 - login throttling, forced password change, last-admin protection
 - the mobile sync: permissions per field, last-write-wins conflicts, deletions, clock skew
+- the backoffice: family accounts can never enter it, every screen works, languages/texts/pages behave (overrides apply, framework messages untouched, drafts stay hidden, pasted scripts do not run)
+
+Tests do not need a built frontend (`npm run build`).
 
 ## Mobile app and API
 
@@ -164,6 +190,7 @@ The Flutter app lives in [`mobile/shopping_list`](mobile/shopping_list). It talk
 - State-changing actions are POST/PUT/DELETE only, with CSRF protection on the web.
 - The realtime channel is private and content-free.
 - Device tokens can be listed and revoked (`GET/DELETE /api/v1/me/devices`) and expire on their own.
+- The backoffice has its own guard and table, so a family account can never reach it; two-factor sign-in is required in production; administrators' passwords need 12+ characters, and the two-factor secret is stored encrypted.
 
 If you find a vulnerability, please tell the maintainer privately rather than opening a public issue.
 
@@ -172,7 +199,7 @@ If you find a vulnerability, please tell the maintainer privately rather than op
 - [x] Upgrade to current Laravel, Livewire, Tailwind, Vite and Flutter
 - [x] Families, accounts, roles, per-list-type permissions, hidden lists
 - [x] Mobile API v1 with device tokens and delta sync
-- [ ] Admin backoffice (Filament): families, users, languages, pages
+- [x] Admin backoffice (Filament): families, members, languages, texts, pages, administrators
 - [ ] Mobile app: login, local database, offline queue and sync, same look and permissions as the web
 - [ ] Nearby sync between family members' Android phones
 - [ ] Push notifications, item categories, audit log, data export/delete, backups

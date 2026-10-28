@@ -77,3 +77,49 @@ function itemIn(ShoppingList $list, int $statusId = 1): Item
 {
     return Item::factory()->create(['shopping_list_id' => $list->id, 'status_id' => $statusId]);
 }
+
+/**
+ * Sign in to the backoffice as a new administrator (the `admin` guard).
+ */
+function backofficeAdmin(array $attributes = []): App\Models\Admin
+{
+    $admin = App\Models\Admin::factory()->create($attributes);
+
+    test()->actingAs($admin, 'admin');
+
+    // actingAs() also makes `admin` the default guard; in a real request the default
+    // stays `web`, and the backoffice names its own guard. Keep tests faithful to that.
+    Illuminate\Support\Facades\Auth::shouldUse('web');
+
+    Filament\Facades\Filament::setCurrentPanel('admin');
+
+    return $admin;
+}
+
+/**
+ * The Filament notifications sent so far in this test (what assertNotified() inspects).
+ *
+ * @return Illuminate\Support\Collection<int, Filament\Notifications\Notification>
+ */
+function sentNotifications(): Illuminate\Support\Collection
+{
+    app(Filament\Notifications\NotificationMailbox::class)->flush();
+
+    $component = new Filament\Notifications\Livewire\Notifications;
+    $component->mount();
+    $component->pullNotificationsFromSession();
+
+    return $component->notifications;
+}
+
+/** The temporary password shown to the admin in the latest "temporary password" notification. */
+function shownTemporaryPassword(): ?string
+{
+    $notification = sentNotifications()->first(
+        fn (Filament\Notifications\Notification $n) => $n->getTitle() === __('bo_temp_password_title')
+    );
+
+    preg_match('/<code[^>]*>([A-Za-z0-9]{12})<\/code>/', (string) $notification?->getBody(), $matches);
+
+    return $matches[1] ?? null;
+}

@@ -4,14 +4,17 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Family\ListTypeController;
 use App\Http\Controllers\Family\MemberController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShoppingListController;
+use App\Models\Language;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
 
-// Language switching (also available on the login page)
+// Language switching (also available on the login page); the languages on
+// offer are the ones switched on in the backoffice
 Route::get('switch-language/{locale}', function (string $locale) {
-    if (!in_array($locale, ['en', 'pt'])) {
+    if (! Language::isActive($locale)) {
         abort(400);
     }
 
@@ -25,6 +28,9 @@ Route::get('switch-language/{locale}', function (string $locale) {
 
     return redirect()->back();
 })->name('switch-language');
+
+// Content pages written in the backoffice (public)
+Route::get('p/{slug}', [PageController::class, 'show'])->name('pages.show');
 
 // Accounts are created by a family admin: there is no public registration
 Route::middleware('guest')->group(function () {
