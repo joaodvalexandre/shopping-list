@@ -46,7 +46,7 @@ All requests and responses are JSON. Send `Accept: application/json` and, for bo
 
 Wrong email or password both answer `422` with the same message. After 5 failed attempts for the same email and IP, further attempts (even with the right password) answer `422` with a "try again in N seconds" message for about a minute.
 
-**First login.** Members are created with a temporary password. For them, `password_change_required` is `true` and the token can **only** call `PUT /me/password` and `POST /auth/logout`; everything else answers `403`. The app should show a "choose your password" screen.
+**First login.** Members are created with a temporary password, which is their family's name (as written). The new password must differ from it. For them, `password_change_required` is `true` and the token can **only** call `PUT /me/password` and `POST /auth/logout`; everything else answers `403`. The app should show a "choose your password" screen.
 
 ### `PUT /me/password`
 

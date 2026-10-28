@@ -21,6 +21,7 @@ class ListTranslations extends ListRecords
             Action::make('sync')
                 ->label(fn () => __('bo_sync_texts'))
                 ->icon(Heroicon::OutlinedArrowPath)
+                ->visible(fn () => (bool) auth('admin')->user()?->hasPermission('texts.update'))
                 ->action(function () {
                     $created = TranslationRepository::sync();
 

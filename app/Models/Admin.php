@@ -6,7 +6,9 @@ use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use SensitiveParameter;
 
@@ -35,6 +37,35 @@ class Admin extends Authenticatable implements FilamentUser, HasAppAuthenticatio
             'app_authentication_secret' => 'encrypted',
             'app_authentication_recovery_codes' => 'encrypted:array',
         ];
+    }
+
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class);
+    }
+
+    /** The super administrator role can do everything, now and for anything added later. */
+    public function isSuperAdmin(): bool
+    {
+        return $this->roles->contains(fn (Role $role) => $role->isSuperAdmin());
+    }
+
+    /** @param  string  $permission  "<group>.<action>", e.g. "pages.update" */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->loadMissing('roles.permissions')
+            ->roles
+            ->contains(fn (Role $role) => $role->permissions->contains('name', $permission));
+    }
+
+    /** Administrators who hold the super administrator role. */
+    public static function superAdmins(): Builder
+    {
+        return static::whereHas('roles', fn (Builder $query) => $query->where('name', Role::SUPER_ADMIN));
     }
 
     /** Every row in `admins` is a backoffice administrator. */

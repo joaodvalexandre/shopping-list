@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Admin;
+use App\Models\Role;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 
@@ -41,9 +43,13 @@ class CreateAdmin extends Command
             return self::FAILURE;
         }
 
-        Admin::create(['name' => $name, 'email' => $email, 'password' => $password]);
+        // The roles ship as seed data; make sure they exist before using one
+        $this->callSilently('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
 
-        $this->info("Administrator {$email} created. Sign in at " . url('/admin'));
+        $admin = Admin::create(['name' => $name, 'email' => $email, 'password' => $password]);
+        $admin->roles()->attach(Role::where('name', Role::SUPER_ADMIN)->value('id'));
+
+        $this->info("Super administrator {$email} created. Sign in at " . url('/admin'));
 
         return self::SUCCESS;
     }

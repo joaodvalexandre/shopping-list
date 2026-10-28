@@ -80,11 +80,13 @@ function itemIn(ShoppingList $list, int $statusId = 1): Item
 
 /**
  * Sign in to the backoffice as a new administrator (the `admin` guard).
+ * A super administrator unless told otherwise; pass a shipped role name
+ * (e.g. "content-editor"), or null for an administrator with no role at all.
  */
-function backofficeAdmin(array $attributes = []): App\Models\Admin
+function backofficeAdmin(array $attributes = [], ?string $role = App\Models\Role::SUPER_ADMIN): App\Models\Admin
 {
-    $admin = App\Models\Admin::factory()->create($attributes);
-
+    $factory = App\Models\Admin::factory();
+    $admin = ($role === null ? $factory : $factory->withRole($role))->create($attributes);
     test()->actingAs($admin, 'admin');
 
     // actingAs() also makes `admin` the default guard; in a real request the default
@@ -119,7 +121,7 @@ function shownTemporaryPassword(): ?string
         fn (Filament\Notifications\Notification $n) => $n->getTitle() === __('bo_temp_password_title')
     );
 
-    preg_match('/<code[^>]*>([A-Za-z0-9]{12})<\/code>/', (string) $notification?->getBody(), $matches);
+    preg_match('/<code[^>]*>(.*?)<\/code>/', (string) $notification?->getBody(), $matches);
 
-    return $matches[1] ?? null;
+    return isset($matches[1]) ? html_entity_decode($matches[1], ENT_QUOTES) : null;
 }

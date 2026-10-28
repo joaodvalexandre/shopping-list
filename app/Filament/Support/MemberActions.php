@@ -31,10 +31,17 @@ class MemberActions
             ->persistent()
             ->title(__('bo_temp_password_title'))
             ->body(new HtmlString(
-                e(__('temporary_password_notice')) . '<br><strong>' . e($email) . '</strong>: '
-                . '<code style="user-select:all">' . e($password) . '</code>'
+                '<strong>' . e($email) . '</strong><br>'
+                . '<code style="user-select:all;font-size:1rem">' . e($password) . '</code><br>'
+                . '<span style="opacity:0.75">' . e(__('bo_temp_password_hint')) . '</span>'
             ))
             ->send();
+    }
+
+    /** Resetting passwords and signing people out count as editing the member. */
+    private static function canManage(): bool
+    {
+        return (bool) auth('admin')->user()?->hasPermission('members.update');
     }
 
     public static function resetPassword(): Action
@@ -43,10 +50,11 @@ class MemberActions
             ->label(fn () => __('reset_password'))
             ->icon(Heroicon::OutlinedKey)
             ->color('warning')
+            ->visible(fn () => static::canManage())
             ->requiresConfirmation()
             ->modalDescription(fn () => __('confirm_reset_password'))
             ->action(function (User $record) {
-                $temporary = TemporaryPassword::generate();
+                $temporary = TemporaryPassword::for($record->family);
 
                 $record->update(['password' => $temporary, 'must_change_password' => true]);
                 $record->forceFill(['remember_token' => null])->save();
@@ -61,6 +69,7 @@ class MemberActions
         return Action::make('signOutEverywhere')
             ->label(fn () => __('bo_sign_out_everywhere'))
             ->icon(Heroicon::OutlinedArrowRightStartOnRectangle)
+            ->visible(fn () => static::canManage())
             ->requiresConfirmation()
             ->modalDescription(fn () => __('bo_sign_out_everywhere_confirm'))
             ->action(function (User $record) {

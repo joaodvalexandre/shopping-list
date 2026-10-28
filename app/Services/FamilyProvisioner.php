@@ -19,12 +19,11 @@ class FamilyProvisioner
      *
      * @return array{family: Family, admin: User, password: string}
      */
-    public function create(string $familyName, string $adminName, string $adminEmail, ?string $password = null): array
+    public function create(string $familyName, string $adminName, string $adminEmail): array
     {
-        $password ??= TemporaryPassword::generate();
-
-        return DB::transaction(function () use ($familyName, $adminName, $adminEmail, $password) {
+        return DB::transaction(function () use ($familyName, $adminName, $adminEmail) {
             $family = Family::create(['name' => $familyName]);
+            $password = TemporaryPassword::for($family);
 
             $family->listTypes()->create(['name' => __('default_list_type')]);
 

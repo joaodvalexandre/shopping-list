@@ -42,7 +42,8 @@ it('creates a member with a temporary password and per-type permissions', functi
         ->and($bia->must_change_password)->toBeTrue();
 
     $tmp = session('temporary_password.password');
-    expect(strlen($tmp))->toBe(12);
+    // the first-time password is the family's name
+    expect($tmp)->toBe($this->f['family']->name);
     expect(Hash::check($tmp, $bia->password))->toBeTrue();
 
     // "add items" implies "view"

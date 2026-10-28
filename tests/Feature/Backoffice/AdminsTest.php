@@ -4,6 +4,7 @@ use App\Filament\Resources\Admins\Pages\CreateAdmin;
 use App\Filament\Resources\Admins\Pages\EditAdmin;
 use App\Filament\Resources\Admins\Pages\ListAdmins;
 use App\Models\Admin;
+use App\Models\Role;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
@@ -12,14 +13,24 @@ beforeEach(function () {
     $this->me = backofficeAdmin();
 });
 
-it('creates another administrator', function () {
+it('creates another administrator with a role', function () {
+    $viewer = Role::where('name', 'viewer')->firstOrFail();
+
     Livewire::test(CreateAdmin::class)
-        ->fillForm(['name' => 'Second', 'email' => 'second@example.com', 'password' => 'a-very-long-pass'])
+        ->fillForm(['name' => 'Second', 'email' => 'second@example.com', 'password' => 'a-very-long-pass', 'roles' => [$viewer->id]])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $second = Admin::where('email', 'second@example.com')->firstOrFail();
-    expect(Hash::check('a-very-long-pass', $second->password))->toBeTrue();
+    expect(Hash::check('a-very-long-pass', $second->password))->toBeTrue()
+        ->and($second->roles->pluck('name')->all())->toBe(['viewer']);
+});
+
+it('requires a role for a new administrator', function () {
+    Livewire::test(CreateAdmin::class)
+        ->fillForm(['name' => 'Second', 'email' => 'second@example.com', 'password' => 'a-very-long-pass'])
+        ->call('create')
+        ->assertHasFormErrors(['roles' => 'required']);
 });
 
 it('requires a long password and a unique email', function () {
@@ -35,7 +46,7 @@ it('requires a long password and a unique email', function () {
 });
 
 it('keeps the current password when the field is left blank on edit', function () {
-    $other = Admin::factory()->create(['password' => 'original-password-1']);
+    $other = Admin::factory()->withRole('viewer')->create(['password' => 'original-password-1']);
 
     Livewire::test(EditAdmin::class, ['record' => $other->getKey()])
         ->fillForm(['name' => 'Renamed', 'password' => ''])
@@ -47,7 +58,7 @@ it('keeps the current password when the field is left blank on edit', function (
 });
 
 it('changes a password when one is typed', function () {
-    $other = Admin::factory()->create(['password' => 'original-password-1']);
+    $other = Admin::factory()->withRole('viewer')->create(['password' => 'original-password-1']);
 
     Livewire::test(EditAdmin::class, ['record' => $other->getKey()])
         ->fillForm(['password' => 'brand-new-password-2'])

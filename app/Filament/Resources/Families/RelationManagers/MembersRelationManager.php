@@ -54,7 +54,7 @@ class MembersRelationManager extends RelationManager
                 CreateAction::make()
                     ->label(fn () => __('new_member'))
                     ->using(function (array $data): User {
-                        $temporary = TemporaryPassword::generate();
+                        $temporary = TemporaryPassword::for($this->getOwnerRecord());
 
                         $member = $this->getOwnerRecord()->users()->create($data + [
                             'password' => $temporary,

@@ -30,7 +30,7 @@ class CreateFamily extends Command
 
         $this->info("Family \"{$result['family']->name}\" created.");
         $this->line("Admin:              {$result['admin']->email}");
-        $this->line("Temporary password: {$result['password']}  (must be changed on first login)");
+        $this->line("Temporary password: {$result['password']}  (the family name; must be changed on first login)");
 
         return self::SUCCESS;
     }

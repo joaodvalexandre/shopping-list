@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users\Pages;
 
 use App\Filament\Resources\Users\UserResource;
 use App\Filament\Support\MemberActions;
+use App\Models\Family;
 use App\Models\User;
 use App\Support\TemporaryPassword;
 use Filament\Notifications\Notification;
@@ -17,7 +18,7 @@ class CreateUser extends CreateRecord
     /** Members are created with a temporary password they must change on first login. */
     protected function handleRecordCreation(array $data): Model
     {
-        $temporary = TemporaryPassword::generate();
+        $temporary = TemporaryPassword::for(Family::findOrFail($data['family_id']));
 
         $member = User::create($data + [
             'password' => $temporary,

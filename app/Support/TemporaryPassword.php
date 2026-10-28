@@ -2,21 +2,17 @@
 
 namespace App\Support;
 
+use App\Models\Family;
+
 class TemporaryPassword
 {
     /**
-     * A readable one-time password (no look-alike characters) that the
-     * member must replace on first login.
+     * The first-time password of anyone in a family is the family's name, exactly
+     * as written. It is easy to pass on, and useless after the first login: the
+     * member is forced to choose their own (and the new one must differ).
      */
-    public static function generate(int $length = 12): string
+    public static function for(Family $family): string
     {
-        $alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        $password = '';
-
-        for ($i = 0; $i < $length; $i++) {
-            $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-
-        return $password;
+        return $family->name;
     }
 }

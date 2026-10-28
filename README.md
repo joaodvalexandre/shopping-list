@@ -34,7 +34,9 @@ A shared shopping list for families. A web app (Laravel + Livewire) where each f
 | **Family admin** | Everything inside their own family: manage members, list types, permissions, and every list. Can promote any member to admin |
 | **Member** | Only what their permissions allow |
 
-Families are created in the backoffice (or from the command line: `php artisan family:create "Silva" "Joana Silva" joana@example.com`). Either way a **one-time temporary password** is shown for the family's first admin, who must choose their own on first login. The same applies to every member a family admin adds (from the **Family** menu): a temporary password is shown once, and the member must replace it on first login.
+Families are created in the backoffice (or from the command line: `php artisan family:create "Silva" "Joana Silva" joana@example.com`). Either way the family's first admin gets a **temporary password: the family's name, exactly as written** (so a family called `Silva` signs in with `Silva`). It is also shown on screen after creating them. The same applies to every member a family admin adds (from the **Family** menu) and to every password reset. On first login, on the web or in the app, the person can do nothing but choose their own password, and the new one must differ from the family name.
+
+> The family name is easy to pass on but also easy to guess, so it only works until the first login. Hand the email and the first-time password to the right person, and do not leave an account waiting for a first login for long (the backoffice shows who is still waiting).
 
 ### Permissions
 
@@ -75,17 +77,54 @@ php artisan admin:create "Your Name" you@example.com
 # asks for a password (12+ characters)
 ```
 
+The first administrator is a **super administrator**. Everyone else sees and does only what their [roles](#roles-and-permissions) allow.
+
 What you can do there:
 
 | Section | |
 |---|---|
-| **Dashboard** | Families, members (and how many are still waiting for their first login), lists, items, latest families |
-| **Families** | Create a family together with its first admin (a temporary password is shown once). Rename, delete (removes the family with everything in it). Each family's page lists its members |
+| **Dashboard** | Totals with a 14-day trend (families, members and how many still wait for their first login, lists, items), new families and members per month, system information, latest families |
+| **Families** | Create a family together with its first admin (the first-time password, the family name, is shown after saving). Rename, delete (removes the family with everything in it). Each family's page lists its members |
 | **Members** | Every member of every family: search, filter by family/role/status. Edit name, email and role (promote to admin), **reset password** (new temporary password, signed out everywhere), **sign out everywhere**, delete. A family can never be left without an admin |
 | **Pages** | Simple content pages (privacy, about, help...) with a title and rich text **per language**, shown at `/p/<address>`. Drafts are hidden; published pages can be linked in the site footer |
 | **Languages** | Switch languages on/off, choose the default, add new ones (Spanish, French...). Whatever is switched on appears in the language menu and in members' settings. The default and English (the fallback) cannot be deleted |
 | **Texts** | Every text of the app, per language. The shipped text is shown next to a box where you type your own version; blank goes back to the default. Placeholders such as `:seconds` must be kept. Use **Sync texts** after adding a language or new texts to the code |
-| **Administrators** | Add and remove people who can sign in to the backoffice; reset someone's two-factor setup if they lose their authenticator |
+| **Administrators** | Add and remove people who can sign in to the backoffice, give them roles; reset someone's two-factor setup if they lose their authenticator |
+| **Roles** | Create roles and tick what each may do, area by area |
+| **Permissions** | The list of everything that can be allowed; add custom ones |
+
+### Roles and permissions
+
+What a backoffice administrator may do is decided by **roles**, each a set of **permissions** named `area.action` (for example `pages.update`). The areas are families, members, pages, languages, texts, administrators, roles and permissions; the actions are view, create, update and delete (texts only have view and update). An administrator can hold several roles, and gets the combination.
+
+These roles ship with the app (and are seeded):
+
+| Role | Allows |
+|---|---|
+| **Super administrator** | Everything, always, including permissions added later. Cannot be changed or deleted, and there must always be at least one |
+| **Support** | See families and members, add families and members, reset passwords |
+| **Content editor** | Write pages, edit texts |
+| **Translator** | See languages, edit texts |
+| **Viewer** | See everything, change nothing |
+
+Rules worth knowing:
+
+- Built-in roles and permissions can be adjusted but never deleted, and a built-in permission's key can never change (the code looks it up by that key). Custom roles are free; custom permissions have no effect until code checks them.
+- Giving roles is itself a permission (`roles.update`), so someone who can edit administrators but not roles cannot promote themselves.
+- Screens and buttons an administrator may not use are hidden, and opening them anyway answers 403.
+- The family app's own roles (family admin, member) and per-list-type permissions are a separate thing, described [above](#how-it-works).
+
+### Seeders
+
+`php artisan db:seed` (also part of `migrate --seed`) is safe to run again at any time:
+
+| Seeder | Adds |
+|---|---|
+| `StatusSeeder` | The three item statuses |
+| `LanguageSeeder` | Portuguese (default) and English |
+| `PermissionSeeder`, `RoleSeeder` | Every permission and the shipped roles. Existing roles keep what was ticked, except the super administrator, which always gets every permission |
+| `TranslationSeeder` | One editable row per text and language |
+| `PageSeeder` | Starter pages (About, Privacy policy, Terms of use) in both languages. **They are a starting point: read them, adjust them and add your contact details in the backoffice before going public.** A page that exists is never overwritten |
 
 **Two-factor sign-in** (authenticator app, with recovery codes) is **required in production** and optional while developing. Each administrator sets it up from their profile.
 
@@ -113,7 +152,7 @@ php artisan key:generate
 Create an empty database (default name `shopping_list`), set `DB_*` in `.env`, then:
 
 ```bash
-php artisan migrate --seed          # tables, item statuses, languages and their texts
+php artisan migrate --seed          # tables, statuses, languages, texts, roles, permissions, starter pages
 php artisan admin:create            # your backoffice login (asks for name, email, password)
 npm install
 npm run build
@@ -125,7 +164,7 @@ Serve it with Laragon (it picks up the project folder) or:
 php artisan serve
 ```
 
-Then sign in to **`/admin`**, create a family (a temporary password is shown once), and sign in to the site with it. After pulling new changes, run `composer install` and `npm run build` again (the backoffice's own scripts are republished automatically by Composer).
+Then sign in to **`/admin`**, create a family, and sign in to the site with the admin's email and the family name as password. After pulling new changes, run `composer install` and `npm run build` again (the backoffice's own scripts are republished automatically by Composer).
 
 ## Day-to-day development
 
@@ -141,7 +180,7 @@ Useful commands:
 
 | Command | Purpose |
 |---|---|
-| `php artisan admin:create` | New backoffice administrator |
+| `php artisan admin:create` | New backoffice super administrator |
 | `php artisan family:create "Family" "Admin name" admin@email` | New family with its first admin (the backoffice does this too) |
 | `php artisan route:list` | All routes |
 | `vendor/bin/pint` | Code style |
@@ -184,7 +223,8 @@ The Flutter app lives in [`mobile/shopping_list`](mobile/shopping_list). It talk
 
 ## Security notes
 
-- No public registration; temporary passwords are shown once and must be changed on first login.
+- No public registration; the first-time password (the family name) only gets someone as far as choosing their own, on the web and on the phone.
+- Backoffice access is role-based: every screen is checked by a policy, and the panel refuses a resource that has none.
 - Logins (web and API) are rate limited per email and IP.
 - A password reset by an admin signs that member out everywhere, including every phone.
 - State-changing actions are POST/PUT/DELETE only, with CSRF protection on the web.
@@ -199,7 +239,7 @@ If you find a vulnerability, please tell the maintainer privately rather than op
 - [x] Upgrade to current Laravel, Livewire, Tailwind, Vite and Flutter
 - [x] Families, accounts, roles, per-list-type permissions, hidden lists
 - [x] Mobile API v1 with device tokens and delta sync
-- [x] Admin backoffice (Filament): families, members, languages, texts, pages, administrators
+- [x] Admin backoffice (Filament): families, members, languages, texts, pages, administrators, roles and permissions
 - [ ] Mobile app: login, local database, offline queue and sync, same look and permissions as the web
 - [ ] Nearby sync between family members' Android phones
 - [ ] Push notifications, item categories, audit log, data export/delete, backups

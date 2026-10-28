@@ -44,7 +44,7 @@ class MemberController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        $temporary = TemporaryPassword::generate();
+        $temporary = TemporaryPassword::for($request->user()->family);
 
         $member = User::create([
             'family_id' => $request->user()->family_id,
@@ -116,7 +116,7 @@ class MemberController extends Controller
 
     public function resetPassword(User $member): RedirectResponse
     {
-        $temporary = TemporaryPassword::generate();
+        $temporary = TemporaryPassword::for($member->family);
         $member->update(['password' => $temporary, 'must_change_password' => true]);
 
         // Sign the member out everywhere: "remember me" cookies and every phone

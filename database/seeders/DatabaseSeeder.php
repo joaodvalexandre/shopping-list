@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Support\Translations\TranslationRepository;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -12,16 +11,18 @@ class DatabaseSeeder extends Seeder
      *
      * Only reference data lives here. Families are created from the
      * backoffice (or `php artisan family:create`), and the first backoffice
-     * administrator with `php artisan admin:create`.
+     * administrator with `php artisan admin:create`. Every seeder can be run
+     * again safely.
      */
     public function run(): void
     {
         $this->call([
             StatusSeeder::class,
             LanguageSeeder::class,
+            PermissionSeeder::class,
+            RoleSeeder::class,
+            TranslationSeeder::class,   // after the languages: one row per text and language
+            PageSeeder::class,
         ]);
-
-        // One editable row per text and language (the texts themselves ship in resources/lang)
-        TranslationRepository::sync();
     }
 }

@@ -383,3 +383,6 @@ temp/
 
 # Filament assets published by `composer install` (filament:upgrade)
 public/fonts/filament/
+
+# Livewire serves its own scripts; a published copy goes stale after upgrades
+/public/vendor/livewire/

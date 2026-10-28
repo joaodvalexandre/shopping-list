@@ -10,9 +10,14 @@ use Filament\Widgets\TableWidget;
 
 class LatestFamilies extends TableWidget
 {
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';
+
+    public static function canView(): bool
+    {
+        return (bool) auth('admin')->user()?->hasPermission('families.view');
+    }
 
     public function table(Table $table): Table
     {
