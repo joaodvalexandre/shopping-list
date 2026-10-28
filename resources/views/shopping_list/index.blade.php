@@ -2,9 +2,11 @@
     <div class="flex justify-between items-center">
         <p></p>
         <div>
-            <a href="{{ route('shopping_list.create') }}" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
-                <i class="fas fa-plus mr-2"></i>{{ __('new_list') }}
-            </a>
+            @if($canCreate)
+                <a href="{{ route('shopping_list.create') }}" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105" wire:navigate>
+                    <i class="fas fa-plus mr-2"></i>{{ __('new_list') }}
+                </a>
+            @endif
         </div>
     </div>
 
@@ -30,7 +32,10 @@
                                     odd:bg-gray-50 even:bg-white
                                     dark:odd:bg-gray-700 dark:even:bg-gray-800
                                     hover:bg-gray-100 dark:hover:bg-gray-600">
-                            <td class="px-6 py-4 whitespace-nowrap">{{ $item->name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {{ $item->name }}
+                                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ $item->listType->name }}</span>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">{{ $item->pending }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">{{ $item->in_cart }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">{{ $item->purchased }}</td>
@@ -46,11 +51,15 @@
                                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-600" wire:navigate>
                                         <x-custom-icon icon="format-list-bulleted"/>
                                     </a>
-                                    <a href="{{ route('shopping_list.edit', $item) }}"
-                                        class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
-                                        <x-custom-icon icon="pencil"/>
-                                    </a>
-                                    <x-delete-button action="{{ route('shopping_list.destroy', $item) }}" />
+                                    @can('update', $item)
+                                        <a href="{{ route('shopping_list.edit', $item) }}"
+                                            class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-600" wire:navigate>
+                                            <x-custom-icon icon="pencil"/>
+                                        </a>
+                                    @endcan
+                                    @can('delete', $item)
+                                        <x-delete-button action="{{ route('shopping_list.destroy', $item) }}" />
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

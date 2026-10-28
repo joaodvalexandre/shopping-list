@@ -8,12 +8,17 @@ use Illuminate\Support\Facades\App;
 
 class LanguageMiddleware
 {
+    private const SUPPORTED = ['en', 'pt'];
+
     public function handle(Request $request, Closure $next)
     {
-        if (session()->has('locale')) {
-            App::setLocale(session()->get('locale'));
+        // The account's saved language wins, then the session choice
+        $locale = $request->user()?->locale ?? session('locale');
+
+        if (in_array($locale, self::SUPPORTED, true)) {
+            App::setLocale($locale);
         }
+
         return $next($request);
     }
 }
-

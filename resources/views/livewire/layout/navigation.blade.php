@@ -12,7 +12,7 @@ new class extends Component
     {
         $logout();
 
-        $this->redirect('/', navigate: true);
+        $this->redirect(route("login"));
     }
 }; ?>
 
@@ -46,6 +46,34 @@ new class extends Component
                     @include('partials.language-dropdown')
                     @include('partials.theme-toggle')
                 </div>
+
+                <!-- User menu -->
+                @auth
+                    <div class="relative pr-2" x-data="{ open: false }">
+                        <button @click="open = !open" type="button"
+                                class="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-hidden">
+                            <x-custom-icon icon="account-circle" size="28" />
+                            <span class="hidden sm:block max-w-32 truncate">{{ auth()->user()->name }}</span>
+                        </button>
+
+                        <div x-show="open" x-cloak @click.away="open = false"
+                             class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-md bg-white dark:bg-gray-700 py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+                             role="menu">
+                            <x-dropdown-nav-link :href="route('settings.edit')" wire:navigate class="text-gray-700 dark:text-gray-300">
+                                {{ __('settings') }}
+                            </x-dropdown-nav-link>
+                            @can('manage-family')
+                                <x-dropdown-nav-link :href="route('family.members.index')" wire:navigate class="text-gray-700 dark:text-gray-300">
+                                    {{ __('family') }}
+                                </x-dropdown-nav-link>
+                            @endcan
+                            <button wire:click="logout" type="button"
+                                    class="mx-2 my-1 block w-[calc(100%-1rem)] px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600">
+                                {{ __('logout') }}
+                            </button>
+                        </div>
+                    </div>
+                @endauth
             </div>
         </div>
     </div>

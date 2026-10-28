@@ -39,7 +39,7 @@ class Notification extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(Family::class);
+        return $this->belongsTo(User::class);
     }
 
     /**

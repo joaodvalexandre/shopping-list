@@ -16,6 +16,8 @@ class Status extends Model
      */
     protected $table = 'status';
 
+    protected $fillable = ['code', 'color'];
+
     /**
      * Get the color as an HTML style.
      *

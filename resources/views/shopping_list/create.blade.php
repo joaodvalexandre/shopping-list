@@ -5,17 +5,7 @@
     <form action="{{ route('shopping_list.store') }}" method="POST">
         @csrf
 
-        <div class="flex flex-col gap-2">
-            <!-- Name -->
-            <div class="flex-1">
-                <x-input.input
-                    name="name"
-                    label="name"
-                    type="text"
-                    required
-                />
-            </div>
-        </div>
+        @include('shopping_list._form_fields')
 
         <!-- Buttons aligned to right -->
         <div class="flex items-center justify-end space-x-2 mt-4">
