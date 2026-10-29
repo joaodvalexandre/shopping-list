@@ -193,3 +193,7 @@ void toast(BuildContext context, String message) {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
 }
+
+/// Room around the content of every scrollable page: a gap under the header, and enough
+/// at the bottom that the last card is never against (or under) the navigation bar.
+const EdgeInsets scrollPadding = EdgeInsets.fromLTRB(12, 20, 12, 40);

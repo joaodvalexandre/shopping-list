@@ -24,7 +24,7 @@ class ListsScreen extends StatelessWidget {
       onRefresh: context.read<SyncService>().sync,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(12),
+        padding: scrollPadding,
         children: [
           if (canCreate)
             Align(
@@ -35,10 +35,10 @@ class ListsScreen extends StatelessWidget {
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ListFormScreen())),
               ),
             ),
-          const SizedBox(height: 12),
+          if (canCreate) const SizedBox(height: 12),
           if (lists.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
               child: Text(
                 context.t('no_lists_yet'),
                 textAlign: TextAlign.center,
@@ -73,7 +73,7 @@ class _ListRow extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: list.uuid))),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -107,16 +107,20 @@ class _ListRow extends StatelessWidget {
                   ],
                 ],
               ),
-              Row(
-                children: [
-                  StatusPill(text: context.t(state.textKey), color: Tw.named(state.color)),
-                  const Spacer(),
-                  _count(context, list.toBuy, 'pending'),
-                  _count(context, list.inCart, 'in_cart'),
-                  _count(context, list.purchased, 'purchased'),
-                  _count(context, list.total, 'total'),
-                  const SizedBox(width: 8),
-                ],
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerLeft, child: StatusPill(text: context.t(state.textKey), color: Tw.named(state.color))),
+              const SizedBox(height: 12),
+              // Four equal columns, so labels have room however narrow the phone is
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Row(
+                  children: [
+                    _count(context, list.toBuy, 'pending'),
+                    _count(context, list.inCart, 'in_cart'),
+                    _count(context, list.purchased, 'purchased'),
+                    _count(context, list.total, 'total'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -126,12 +130,17 @@ class _ListRow extends StatelessWidget {
   }
 
   Widget _count(BuildContext context, int value, String key) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 14),
+    return Expanded(
       child: Column(
         children: [
-          Text('$value', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          Text(context.t(key), style: TextStyle(fontSize: 10, color: context.isDark ? Tw.gray400 : Tw.gray500)),
+          Text('$value', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(
+            context.t(key),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: context.isDark ? Tw.gray400 : Tw.gray500),
+          ),
         ],
       ),
     );

@@ -55,7 +55,7 @@ class ListDetailScreen extends StatelessWidget {
         children: [
           const SyncBanner(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -89,7 +89,7 @@ class ListDetailScreen extends StatelessWidget {
               child: items.isEmpty
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.fromLTRB(32, 48, 32, 40),
                       children: [
                         Text(
                           context.t('no_items_yet'),
@@ -100,7 +100,7 @@ class ListDetailScreen extends StatelessWidget {
                     )
                   : ListView.separated(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 40),
                       itemCount: items.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) => _ItemRow(
@@ -177,18 +177,21 @@ class _ItemRow extends StatelessWidget {
             ),
             if (item.status == ItemStatus.toBuy && canStatus)
               IconButton(
+                visualDensity: VisualDensity.compact,
                 tooltip: context.t('add_cart'),
                 icon: Icon(Icons.add_shopping_cart, color: dark ? Tw.blue500 : Tw.blue600),
                 onPressed: () => repository.setStatus(item.listUuid, item.uuid, ItemStatus.inCart),
               ),
             if (item.status == ItemStatus.inCart && canStatus)
               IconButton(
+                visualDensity: VisualDensity.compact,
                 tooltip: context.t('remove_cart'),
                 icon: Icon(Icons.remove_shopping_cart_outlined, color: dark ? Tw.orange500 : Tw.orange600),
                 onPressed: () => repository.setStatus(item.listUuid, item.uuid, ItemStatus.toBuy),
               ),
             if (item.status == ItemStatus.toBuy && canEdit)
               IconButton(
+                visualDensity: VisualDensity.compact,
                 tooltip: context.t('edit'),
                 icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
                 onPressed: () => Navigator.of(context).push(
@@ -197,6 +200,7 @@ class _ItemRow extends StatelessWidget {
               ),
             if (canEdit)
               IconButton(
+                visualDensity: VisualDensity.compact,
                 tooltip: context.t('delete'),
                 icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
                 onPressed: () async {

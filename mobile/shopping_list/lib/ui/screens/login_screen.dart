@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 autofillHints: const [AutofillHints.username, AutofillHints.email],
                 textInputAction: TextInputAction.next,
                 autofocus: true,
-                validator: (value) => (value ?? '').trim().isEmpty ? context.rt('email') : null,
+                validator: (value) => (value ?? '').trim().isEmpty ? context.rt('app_required') : null,
               ),
               const SizedBox(height: 16),
               LabeledField(
@@ -138,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 autofillHints: const [AutofillHints.password],
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _submit(),
-                validator: (value) => (value ?? '').isEmpty ? context.rt('password') : null,
+                validator: (value) => (value ?? '').isEmpty ? context.rt('app_required') : null,
                 suffix: ExcludeFocus(child: IconButton(
                   icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
                   onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: context.t('app_server'),
                   controller: _server,
                   keyboardType: TextInputType.url,
-                  validator: (value) => (value ?? '').trim().isEmpty ? context.rt('app_server') : null,
+                  validator: (value) => (value ?? '').trim().isEmpty ? context.rt('app_required') : null,
                 ),
                 const SizedBox(height: 4),
                 Text(context.t('app_server_help'), style: TextStyle(fontSize: 12, color: dark ? Tw.gray400 : Tw.gray500)),

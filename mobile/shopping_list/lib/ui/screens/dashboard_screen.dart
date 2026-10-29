@@ -31,7 +31,7 @@ class DashboardScreen extends StatelessWidget {
       child: lists.isEmpty
           ? ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.fromLTRB(32, 48, 32, 40),
               children: [
                 const SizedBox(height: 32),
                 Text(context.t('dashboard_information'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
@@ -43,7 +43,7 @@ class DashboardScreen extends StatelessWidget {
 
                 return GridView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(12),
+                  padding: scrollPadding,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     mainAxisSpacing: 12,

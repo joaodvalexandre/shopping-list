@@ -88,7 +88,7 @@ class _PasswordFormState extends State<PasswordForm> {
             controller: _current,
             obscure: true,
             textInputAction: TextInputAction.next,
-            validator: (value) => (value ?? '').isEmpty ? context.rt('current_password') : null,
+            validator: (value) => (value ?? '').isEmpty ? context.rt('app_required') : null,
           ),
           _error('current_password'),
           const SizedBox(height: 12),

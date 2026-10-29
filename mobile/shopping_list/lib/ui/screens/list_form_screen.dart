@@ -71,7 +71,7 @@ class _ListFormScreenState extends State<ListFormScreen> {
         actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: scrollPadding,
         child: Panel(
           padding: const EdgeInsets.all(20),
           child: Form(
@@ -86,7 +86,7 @@ class _ListFormScreenState extends State<ListFormScreen> {
                   textInputAction: TextInputAction.done,
                   validator: (value) {
                     final text = (value ?? '').trim();
-                    return text.isEmpty || text.length > 255 ? context.rt('name') : null;
+                    return text.isEmpty || text.length > 255 ? context.rt('app_required') : null;
                   },
                 ),
                 const SizedBox(height: 16),

@@ -282,8 +282,9 @@
 
     "app_server":               "Servidor",
     "app_server_help":          "O endereço do servidor da Lista de Compras, por exemplo https://listas.exemplo.pt",
+    "app_required":             "Obrigatório",
     "app_cannot_reach":         "Não foi possível contactar o servidor. Verifica o endereço e a ligação.",
-    "app_offline":              "Sem ligação: as alterações ficam guardadas e são enviadas quando voltares a ter rede",
+    "app_offline":              "Sem ligação",
     "app_sync_error":           "Não foi possível sincronizar. Toca para tentar de novo",
     "app_syncing":              "A sincronizar...",
     "app_waiting_changes":      ":count alteração(ões) por sincronizar",

@@ -1,6 +1,7 @@
 <x-guest-layout no-menu :title="__('choose_password')">
     <form method="POST" action="{{ route('password.choose.store') }}" class="flex flex-col gap-4">
         @csrf
+        @method('PUT')
 
         <div class="p-4 rounded-lg bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100 text-sm">
             {{ __('must_change_password') }}

@@ -50,7 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: scrollPadding,
         children: [
           // Profile (changed on the web; here to see who is signed in)
           Panel(

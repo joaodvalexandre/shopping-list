@@ -125,3 +125,19 @@ it('checks the new password on the choose-password page', function () {
 
     expect(User::where('email', 'joana@example.com')->first()->must_change_password)->toBeTrue();
 });
+
+it('submits the choose-password form the way a browser does (a POST that says _method=PUT)', function () {
+    app(FamilyProvisioner::class)->create('Silva', 'Joana', 'joana@example.com');
+    $this->post('/login', ['email' => 'joana@example.com', 'password' => 'Silva']);
+
+    // the page's own form must carry the method override...
+    $this->get('/password/choose')->assertOk()
+        ->assertSee('name="_method"', false)->assertSee('value="PUT"', false)
+        ->assertSee('action="' . route('password.choose.store') . '"', false);
+
+    // ...and a real POST with it must work
+    $this->post('/password/choose', ['_method' => 'PUT', 'password' => 'Brand-new-1', 'password_confirmation' => 'Brand-new-1'])
+        ->assertRedirect(route('dashboard'));
+
+    expect(User::where('email', 'joana@example.com')->first()->must_change_password)->toBeFalse();
+});
