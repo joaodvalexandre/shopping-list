@@ -55,6 +55,7 @@ class AuthController extends Controller
 
         RateLimiter::clear($throttleKey);
         $user->forceFill(['last_login_at' => now()])->save();
+        $user->requirePasswordChangeIfDefault($data['password']);
 
         return $this->tokenResponse($user, $data['device_name']);
     }

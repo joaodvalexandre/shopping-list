@@ -10,6 +10,7 @@ use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Models\Family;
 use App\Models\ListType;
+use App\Models\ShoppingList;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
@@ -86,12 +87,14 @@ it('deletes a family with everything in it, and signs its devices out', function
     $f = makeFamily();
     $list = listIn($f['groceries']);
     itemIn($list);
+    listIn($f['groceries'])->delete(); // a deleted list lingers as a tombstone and still points at its type
     $f['admin']->createToken('Phone', ['sync']);
 
     Livewire::test(ListFamilies::class)
         ->callAction(TestAction::make('delete')->table($f['family']));
 
     expect(Family::count())->toBe(0)->and(User::count())->toBe(0)->and(ListType::count())->toBe(0);
+    expect(ShoppingList::withTrashed()->count())->toBe(0);
     expect(DB::table('personal_access_tokens')->count())->toBe(0);
 });
 

@@ -62,11 +62,14 @@ Future<int> runBackgroundCheck() async {
   final token = await const FlutterSecureStorage().read(key: AuthState.tokenKey);
   if (token == null) return 0;
 
+  // Not closed afterwards: sqflite shares one connection per file within the process, and this
+  // can run while the app itself is open (or paused), where closing it would kill the app's own
+  // database ("database_closed" on every sync until restart). The process ending closes it.
   final db = await LocalDb.open();
-  try {
-    final language = prefs.getString(SettingsState.effectiveLanguageKey);
-    final api = ApiClient(baseUrl: prefs.getString('server') ?? defaultServerUrl, token: token)..language = language;
+  final language = prefs.getString(SettingsState.effectiveLanguageKey);
+  final api = ApiClient(baseUrl: prefs.getString('server') ?? defaultServerUrl, token: token)..language = language;
 
+  try {
     final service = NotificationService(
       store: db,
       prefs: prefs,
@@ -76,6 +79,6 @@ Future<int> runBackgroundCheck() async {
 
     return await service.check(api, foreground: false);
   } finally {
-    await db.close();
+    api.close();
   }
 }

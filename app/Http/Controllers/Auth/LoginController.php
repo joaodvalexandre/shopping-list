@@ -46,6 +46,7 @@ class LoginController extends Controller
         RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
         $request->user()->forceFill(['last_login_at' => now()])->save();
+        $request->user()->requirePasswordChangeIfDefault($credentials['password']);
 
         return redirect()->intended(route('dashboard'));
     }

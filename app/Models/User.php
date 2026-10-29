@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FamilyRole;
 use App\Enums\ListAbility;
+use App\Support\TemporaryPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -66,6 +67,18 @@ class User extends Authenticatable
     public function hiddenLists(): BelongsToMany
     {
         return $this->belongsToMany(ShoppingList::class, 'shopping_list_hidden_from');
+    }
+
+    /**
+     * Whoever signs in with the family's first-time password (its name) must choose their own,
+     * even when the account was not flagged: the password is public knowledge.
+     * Called at sign-in, with the password that was typed.
+     */
+    public function requirePasswordChangeIfDefault(string $typedPassword): void
+    {
+        if (! $this->must_change_password && $this->family && hash_equals(TemporaryPassword::for($this->family), $typedPassword)) {
+            $this->forceFill(['must_change_password' => true])->save();
+        }
     }
 
     public function isFamilyAdmin(): bool

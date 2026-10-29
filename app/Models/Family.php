@@ -16,7 +16,13 @@ class Family extends Model
     {
         // Deleting a family removes its members in the database (cascade), which
         // skips model events - so sign their devices out here first.
-        static::deleting(fn (Family $family) => $family->users->each(fn (User $user) => $user->tokens()->delete()));
+        // A list type cannot go while a list (even a deleted one, kept as a tombstone) still
+        // points at it, and the database may cascade the types before the lists: so the lists
+        // (and their items) go first.
+        static::deleting(function (Family $family) {
+            $family->users->each(fn (User $user) => $user->tokens()->delete());
+            $family->shoppingLists()->withTrashed()->forceDelete();
+        });
     }
 
     public function users(): HasMany

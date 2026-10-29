@@ -94,6 +94,38 @@ it('only gives a phone the right to change the password until it has been change
     ])->assertOk()->assertJsonPath('password_change_required', false);
 });
 
+it('forces a change on the phone for anyone who signs in with the family name, flagged or not', function () {
+    $f = makeFamily();
+    $f['family']->update(['name' => 'Silva']);
+    $member = User::factory()->create(['family_id' => $f['family']->id, 'password' => 'Silva', 'must_change_password' => false]);
+
+    $this->postJson('/api/v1/auth/login', ['email' => $member->email, 'password' => 'Silva', 'device_name' => 'Pixel'])
+        ->assertOk()
+        ->assertJsonPath('password_change_required', true);
+
+    expect($member->fresh()->must_change_password)->toBeTrue();
+});
+
+it('forces a change on the web for anyone who signs in with the family name, flagged or not', function () {
+    $f = makeFamily();
+    $f['family']->update(['name' => 'Silva']);
+    $member = User::factory()->create(['family_id' => $f['family']->id, 'password' => 'Silva', 'must_change_password' => false]);
+
+    $this->post('/login', ['email' => $member->email, 'password' => 'Silva']);
+
+    $this->get('/dashboard')->assertRedirect(route('password.choose'));
+});
+
+it('does not force a change on someone who chose their own password', function () {
+    $f = makeFamily();
+    $f['family']->update(['name' => 'Silva']);
+    $member = User::factory()->create(['family_id' => $f['family']->id, 'password' => 'Their-own-1', 'must_change_password' => false]);
+
+    $this->postJson('/api/v1/auth/login', ['email' => $member->email, 'password' => 'Their-own-1', 'device_name' => 'Pixel'])
+        ->assertOk()
+        ->assertJsonPath('password_change_required', false);
+});
+
 it('uses the name of the right family, not another one', function () {
     app(FamilyProvisioner::class)->create('Silva', 'Joana', 'joana@example.com');
     app(FamilyProvisioner::class)->create('Costa', 'Rui', 'rui@example.com');
