@@ -145,8 +145,10 @@ class ApiClient {
 
   Future<void> logout() => _send('POST', '/auth/logout');
 
-  /// The navbar, account menu and footer links set up in the backoffice (public).
-  Future<Map<String, dynamic>> menus(String locale) => _send('GET', '/menus?locale=$locale');
+  /// Languages, texts, pages and menu links (public). With the version the app already
+  /// holds the server answers `{unchanged: true}` when nothing moved.
+  Future<Map<String, dynamic>> content({String? version}) =>
+      _send('GET', version == null || version.isEmpty ? '/content' : '/content?version=${Uri.encodeQueryComponent(version)}');
 
   Future<Map<String, dynamic>> me() => _send('GET', '/me');
 

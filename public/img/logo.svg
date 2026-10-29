@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22C55E"/><stop offset="1" stop-color="#15803D"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#g)"/>
+  <!-- handle -->
+  <path d="M338 470 C338 215 686 215 686 470" fill="none" stroke="#fff" stroke-width="46" stroke-linecap="round"/>
+  <!-- produce peeking out -->
+  <circle cx="430" cy="410" r="62" fill="#FB923C"/>
+  <circle cx="598" cy="392" r="54" fill="#FACC15"/>
+  <!-- the basket -->
+  <path d="M214 462 H810 L742 762 Q735 794 703 794 H321 Q289 794 282 762 Z" fill="#fff"/>
+  <rect x="190" y="430" width="644" height="64" rx="32" fill="#fff"/>
+  <!-- ticked off -->
+  <path d="M404 618 L486 700 L636 546" fill="none" stroke="#15803D" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

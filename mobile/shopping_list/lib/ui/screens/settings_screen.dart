@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/api_client.dart';
 import '../../data/repository.dart';
-import '../../state/menu_service.dart';
 import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
@@ -39,7 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = context.watch<SettingsState>();
     final repository = context.watch<Repository>();
     final sync = context.watch<SyncService>();
-    final menus = context.watch<MenuService>();
+    final accountLinks = [...context.menuLinks('navbar'), ...context.menuLinks('user_menu')];
     final me = repository.me;
     final dark = context.isDark;
     final muted = dark ? Tw.gray400 : Tw.gray500;
@@ -72,8 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   isExpanded: true,
                   decoration: const InputDecoration(isDense: true),
                   items: [
-                    for (final entry in SettingsState.supportedLanguages.entries)
-                      DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+                    for (final language in settings.languages)
+                      DropdownMenuItem(value: language.code, child: Text(language.nativeName)),
                   ],
                   onChanged: (code) => code == null ? null : settings.setLanguage(code),
                 ),
@@ -105,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: PillButton(
                     label: context.t('app_sync_now'),
                     icon: Icons.sync,
-                    onPressed: sync.isSyncing ? null : sync.sync,
+                    onPressed: sync.isSyncing ? null : () => syncEverything(context),
                   ),
                 ),
               ],
@@ -141,19 +140,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Links arranged in the backoffice (About, Privacy...)
-          if (menus.userMenu.isNotEmpty)
+          // Links arranged in the backoffice (About, Privacy...); pages open inside the app
+          if (accountLinks.any((link) => link.goesSomewhere))
             Panel(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 children: [
-                  for (final link in menus.userMenu)
-                    if (link.url != null)
+                  for (final link in accountLinks)
+                    if (link.goesSomewhere)
                       ListTile(
                         dense: true,
                         title: Text(link.label),
-                        trailing: const Icon(Icons.open_in_new, size: 18),
-                        onTap: () => openLink(link),
+                        trailing: Icon(link.page != null ? Icons.chevron_right : Icons.open_in_new, size: 18),
+                        onTap: () => openLink(context, link),
                       ),
                 ],
               ),

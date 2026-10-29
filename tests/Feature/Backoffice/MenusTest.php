@@ -251,40 +251,6 @@ it('seeds starter links once and never puts back what was changed', function () 
 
 // --------------------------------------------------------------------- api
 
-it('gives the phone the page and address links, public, in its language, without web screens', function () {
-    $this->seed(PageSeeder::class);
-    $this->seed(MenuSeeder::class);
-
-    $response = $this->getJson('/api/v1/menus?locale=en')->assertOk()
-        ->assertJsonPath('locale', 'en')
-        ->assertJsonPath('footer.0.label', 'Information')
-        ->assertJsonPath('footer.0.children.0.label', 'About')
-        ->assertJsonPath('footer.1.children.0.label', 'Privacy policy');
-
-    expect($response->json('footer.1.children.0.url'))->toEndWith('/p/privacy?lang=en')
-        ->and($response->json('navbar.0.label'))->toBe('About')         // the web screens are left out
-        ->and(collect($response->json('navbar'))->pluck('label')->all())->not->toContain('Dashboard')
-        ->and($response->json('user_menu'))->toBe([]);
-
-    $this->getJson('/api/v1/menus?locale=pt')->assertJsonPath('footer.1.children.1.label', 'Termos de utilização');
-    $this->getJson('/api/v1/menus?locale=xx')->assertOk()->assertJsonPath('locale', 'pt');   // an unknown language: the default
-});
-
-it('shows the phone the links of its own audience', function () {
-    $f = makeFamily();
-    $about = aboutPage();
-    MenuItem::create(['location' => 'footer', 'page_id' => $about->id, 'audience' => 'members']);
-    MenuItem::create(['location' => 'footer', 'url' => 'https://example.com/admins', 'label' => ['pt' => 'Admins', 'en' => 'Admins'], 'audience' => 'family_admins']);
-
-    $this->getJson('/api/v1/menus?locale=en')->assertJsonPath('footer', []);
-
-    Sanctum::actingAs(memberWith($f['family'], $f['groceries'], ['can_view']));
-    expect(collect($this->getJson('/api/v1/menus?locale=en')->json('footer'))->pluck('label')->all())->toBe(['About']);
-
-    Sanctum::actingAs($f['admin']);
-    expect(collect($this->getJson('/api/v1/menus?locale=en')->json('footer'))->pluck('label')->all())->toBe(['About', 'Admins']);
-});
-
 it('shows a page in the language the app asks for', function () {
     aboutPage();
 

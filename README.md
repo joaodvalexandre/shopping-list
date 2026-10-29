@@ -1,6 +1,6 @@
-# Shopping List
+# Cestou
 
-A shared shopping list for families. A web app (Laravel + Livewire) where each family manages its own lists, and a Flutter mobile app that syncs with it.
+A shared shopping list for families (*cestou*: from *cesta*, Portuguese for basket). A web app (Laravel + Livewire) where each family manages its own lists, and a Flutter mobile app that syncs with it.
 
 - Accounts are **created by an administrator**; there is no public sign-up.
 - Every family has its own members, list types and lists, and cannot see anyone else's.
@@ -8,7 +8,7 @@ A shared shopping list for families. A web app (Laravel + Livewire) where each f
 - A list can be **hidden from specific members** (the birthday person never sees the party list).
 - Portuguese and English.
 
-> **Status:** work in progress. The web app, accounts, permissions, the mobile API (v1) and the admin backoffice are done. The mobile app is still being reworked to use the API. See [Roadmap](#roadmap).
+> **Status:** work in progress. The web app, accounts, permissions, the mobile API (v1) and the admin backoffice are done. The Android app works offline and syncs through the API. See [Roadmap](#roadmap).
 
 ## Contents
 
@@ -137,7 +137,7 @@ Things to know:
 - Hiding a link does **not** protect a page; it only decides who is offered it. Every screen still checks permissions itself.
 - Only `http(s)` addresses and paths of this site are linked, never `javascript:` and the like. A link to a draft page, or a heading with nothing under it, is not drawn.
 - The app never leaves a signed-in person without a way around: if no navbar link is meant for them, the dashboard and shopping lists are shown anyway.
-- The phone app shows the same page and address links (`GET /api/v1/menus`); the app's own web screens are left out, as it has its own.
+- The phone app keeps its own copy of the languages, texts, pages and links (`GET /api/v1/content`), so it shows them offline; the app's own web screens are left out, as it has its own. Each link's audience is applied on the phone.
 
 ### Seeders
 
@@ -266,7 +266,7 @@ If you find a vulnerability, please tell the maintainer privately rather than op
 - [x] Families, accounts, roles, per-list-type permissions, hidden lists
 - [x] Mobile API v1 with device tokens and delta sync
 - [x] Admin backoffice (Filament): families, members, languages, texts, pages, administrators, roles and permissions
-- [ ] Mobile app: login, local database, offline queue and sync, same look and permissions as the web
+- [x] Mobile app: login, local database, offline queue and sync, same look and permissions as the web, texts/pages/menus kept locally
 - [ ] Nearby sync between family members' Android phones
 - [ ] Push notifications, item categories, audit log, data export/delete, backups
 

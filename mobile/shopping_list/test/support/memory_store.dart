@@ -1,3 +1,4 @@
+import 'package:shopping_list/data/content.dart';
 import 'package:shopping_list/data/local_db.dart';
 import 'package:shopping_list/data/models.dart';
 
@@ -6,6 +7,7 @@ class MemoryStore implements LocalStore {
   final lists = <String, ShoppingListRecord>{};
   final items = <String, ItemRecord>{};
   final meta = <String, String>{};
+  ContentSnapshot? content;
 
   @override
   Future<List<ShoppingListRecord>> loadAll() async {
@@ -50,6 +52,12 @@ class MemoryStore implements LocalStore {
       meta[key] = value;
     }
   }
+
+  @override
+  Future<ContentSnapshot?> loadContent() async => content;
+
+  @override
+  Future<void> saveContent(ContentSnapshot snapshot) async => content = snapshot;
 
   @override
   Future<void> wipe() async {

@@ -1,5 +1,5 @@
 name: shopping_list
-description: "Family shopping list: the phone app of the Shopping List web app."
+description: "Cestou: the family shopping list, on your phone."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -50,6 +50,7 @@ dependencies:
   share_plus: ^11.0.0
   device_info_plus: ^11.3.0
   url_launcher: ^6.3.1
+  flutter_widget_from_html_core: ^0.17.4
 
 dev_dependencies:
   flutter_test:
@@ -75,7 +76,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/lang/
+    - assets/content.json
+    - assets/icon/logo.png
 
   # Figtree, the web app's font (one variable file serves every weight)
   fonts:
@@ -115,14 +117,13 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Flutter Launcher Icons configuration
+# Launcher icon: the sources and the script that draws them are in assets/icon.
+# After changing them: node assets/icon/render.mjs && dart run flutter_launcher_icons
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/shopping_cart_icon.png"
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#16A34A"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
   min_sdk_android: 21
-  web:
-    generate: true
-    image_path: "assets/shopping_cart_icon.png"
-    background_color: "#7C3AED"
-    theme_color: "#7C3AED"

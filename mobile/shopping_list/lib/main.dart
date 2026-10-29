@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/api_client.dart';
 import 'data/local_db.dart';
 import 'data/repository.dart';
 import 'state/auth_state.dart';
-import 'state/menu_service.dart';
+import 'state/content_service.dart';
 import 'state/settings_state.dart';
 import 'state/sync_service.dart';
 import 'ui/screens/first_login_screen.dart';
@@ -19,14 +18,15 @@ import 'ui/widgets/top_bar.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final settings = await SettingsState.load();
-  final repository = Repository(await LocalDb.open());
+  final db = await LocalDb.open();
+  final content = await ContentService.load(db);
+  final settings = await SettingsState.load(content);
+  final repository = Repository(db);
   await repository.load();
 
   final api = ApiClient(baseUrl: settings.serverUrl);
   final auth = AuthState(api: api, repository: repository, settings: settings);
   final sync = SyncService(api: api, repository: repository, auth: auth);
-  final menus = MenuService(api: api, prefs: await SharedPreferences.getInstance());
 
   await auth.init();
 
@@ -38,7 +38,7 @@ Future<void> main() async {
         ChangeNotifierProvider<Repository>.value(value: repository),
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<SyncService>.value(value: sync),
-        ChangeNotifierProvider<MenuService>.value(value: menus),
+        ChangeNotifierProvider<ContentService>.value(value: content),
       ],
       child: const ShoppingListApp(),
     ),
@@ -53,13 +53,13 @@ class ShoppingListApp extends StatelessWidget {
     final settings = context.watch<SettingsState>();
 
     return MaterialApp(
-      title: 'Shopping List',
+      title: 'Cestou',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: settings.themeMode,
       locale: settings.locale,
-      supportedLocales: [for (final code in SettingsState.supportedLanguages.keys) Locale(code)],
+      supportedLocales: [for (final language in settings.languages) Locale(language.code)],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -71,7 +71,7 @@ class ShoppingListApp extends StatelessWidget {
 }
 
 /// Picks the screen for where the person is: sign in, first-login password, or the app.
-/// Also starts and stops the sync, and keeps the footer links in the chosen language.
+/// Also starts and stops the sync, and refreshes the texts, pages and links from the server.
 class AppRoot extends StatefulWidget {
   const AppRoot({super.key});
 
@@ -81,20 +81,14 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   AuthStatus? _last;
-  String? _language;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     context.read<AuthState>().addListener(_authChanged);
-    context.read<SettingsState>().addListener(_languageChanged);
 
-    final menus = context.read<MenuService>();
-    final language = context.read<SettingsState>().language;
-    menus.loadCached(language);
-    menus.refresh(language);
-    _language = language;
+    _refreshContent();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _authChanged());
   }
@@ -103,7 +97,6 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     context.read<AuthState>().removeListener(_authChanged);
-    context.read<SettingsState>().removeListener(_languageChanged);
     super.dispose();
   }
 
@@ -118,21 +111,20 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     } else {
       sync.stop();
     }
+
+    // Signing in or out can change which links and texts apply
+    _refreshContent();
   }
 
-  void _languageChanged() {
-    final language = context.read<SettingsState>().language;
-    if (language == _language) return;
-    _language = language;
-
-    final menus = context.read<MenuService>();
-    menus.loadCached(language);
-    menus.refresh(language, force: true);
-  }
+  /// Texts, pages and links from the server; quiet when it cannot be reached.
+  void _refreshContent() => context.read<ContentService>().refresh(context.read<ApiClient>());
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) context.read<SyncService>().sync();
+    if (state == AppLifecycleState.resumed) {
+      context.read<SyncService>().sync();
+      _refreshContent();
+    }
   }
 
   @override

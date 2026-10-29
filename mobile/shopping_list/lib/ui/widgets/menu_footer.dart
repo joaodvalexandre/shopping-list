@@ -2,11 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../state/menu_service.dart';
+import '../../data/content.dart';
+import '../../data/repository.dart';
+import '../../state/auth_state.dart';
+import '../../state/content_service.dart';
+import '../../state/settings_state.dart';
+import '../screens/page_screen.dart';
 import '../theme.dart';
 import 'common.dart';
 
-Future<void> openLink(MenuLink link) async {
+extension MenuLinks on BuildContext {
+  /// The links of a menu ('navbar', 'user_menu', 'footer') for whoever is looking:
+  /// signed out, a member, or a family admin; in the app's language.
+  List<MenuLink> menuLinks(String location) {
+    final signedIn = watch<AuthState>().status == AuthStatus.signedIn;
+    final admin = watch<Repository>().me?.isAdmin ?? false;
+
+    return watch<ContentService>().links(
+      location,
+      language: watch<SettingsState>().language,
+      viewer: !signedIn ? Viewer.guest : (admin ? Viewer.familyAdmin : Viewer.member),
+    );
+  }
+}
+
+/// A page opens inside the app, from the local copy; an address opens in the browser.
+Future<void> openLink(BuildContext context, MenuLink link) async {
+  final page = link.page;
+  if (page != null) {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PageScreen(slug: page)));
+    return;
+  }
+
   final url = link.url;
   if (url == null) return;
 
@@ -20,7 +47,7 @@ class MenuFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final links = context.watch<MenuService>().footer;
+    final links = context.menuLinks('footer');
     if (links.isEmpty) return const SizedBox.shrink();
 
     final dark = context.isDark;
@@ -31,7 +58,7 @@ class MenuFooter extends StatelessWidget {
     final loose = links.where((link) => link.children.isEmpty).toList();
 
     Widget anchor(MenuLink link, {bool bold = false}) => InkWell(
-          onTap: link.url == null ? null : () => openLink(link),
+          onTap: link.goesSomewhere ? () => openLink(context, link) : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Text(

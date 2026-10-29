@@ -280,7 +280,7 @@
     "bo_perm_group_menus":      "Menus",
 
     "app_server":               "Servidor",
-    "app_server_help":          "O endereço do servidor da Lista de Compras, por exemplo https://listas.exemplo.pt",
+    "app_server_help":          "O endereço do servidor do Cestou, por exemplo https://listas.exemplo.pt",
     "app_required":             "Obrigatório",
     "app_cannot_reach":         "Não foi possível contactar o servidor. Verifica o endereço e a ligação.",
     "app_offline":              "Sem ligação",
@@ -293,6 +293,7 @@
     "app_sync":                 "Sincronização",
     "app_last_sync":            "Última sincronização",
     "app_never":                "Nunca",
+    "app_page_missing":         "Esta página não está disponível.",
     "app_pending":              "Por sincronizar",
     "app_sync_now":             "Sincronizar agora",
     "app_devices":              "Os meus dispositivos",

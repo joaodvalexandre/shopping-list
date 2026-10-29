@@ -1,8 +1,8 @@
 #!/bin/sh
-# The phone app uses the web app's own texts, so wording is identical on both.
-# Run after changing resources/lang/*.json at the project root.
+# The phone app ships with a copy of the web app's languages, texts, pages (About, Privacy,
+# Terms...) and menu links, so a fresh install works before its first connection. It then
+# keeps itself up to date from GET /api/v1/content. Run this after changing the texts in
+# resources/lang/*.json, or the pages and menus (ideally on a freshly seeded database).
 set -e
-cd "$(dirname "$0")/.."
-cp ../../resources/lang/en.json assets/lang/en.json
-cp ../../resources/lang/pt.json assets/lang/pt.json
-echo "Copied the web app's texts to assets/lang"
+cd "$(dirname "$0")/../../.."
+php artisan mobile:export-content

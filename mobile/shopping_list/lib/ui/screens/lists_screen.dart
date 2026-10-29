@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../data/me.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
-import '../../state/sync_service.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'list_detail_screen.dart';
@@ -21,7 +20,7 @@ class ListsScreen extends StatelessWidget {
     final canCreate = repository.me?.canCreateLists ?? false;
 
     return RefreshIndicator(
-      onRefresh: context.read<SyncService>().sync,
+      onRefresh: () => syncEverything(context),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: scrollPadding,

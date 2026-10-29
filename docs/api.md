@@ -203,22 +203,28 @@ Every synced field has its own change time, so two phones editing *different* fi
 - Tombstones for lists in `known_lists` and for items of visible lists.
 - `hidden_from` on a list is included only for users who may manage it.
 
-## Menus
+## Content
 
-### `GET /menus?locale=pt`
+### `GET /content?version=abc123`
 
-Public (no token needed). The navbar, account menu and footer links arranged in the backoffice, in the given language (an unknown or missing one falls back to the default). With a token, links meant only for signed-in people or family admins are included for those who may see them.
+Public (no token needed). What the phone keeps in its own database apart from the family's lists: the languages on offer, every text in each of them, the published content pages and the menu links.
 
 ```json
 {
-  "locale": "pt",
-  "navbar": [ { "label": "Sobre", "url": "https://example.com/p/about?lang=pt", "new_tab": false, "children": [] } ],
-  "user_menu": [],
-  "footer": [ { "label": "Legal", "url": null, "new_tab": false, "children": [ { "label": "Política de privacidade", "url": "https://example.com/p/privacy?lang=pt", "new_tab": false, "children": [] } ] } ]
+  "version": "f5d838c004280bc4",
+  "languages": [ { "code": "pt", "name": "Portuguese", "native_name": "Português", "is_default": true } ],
+  "texts": { "pt": { "login": "Entrar" }, "en": { "login": "Log in" } },
+  "pages": [ { "slug": "privacy", "title": { "pt": "Política de privacidade", "en": "Privacy policy" }, "content": { "pt": "<p>...</p>", "en": "<p>...</p>" } } ],
+  "menu": [
+    { "id": 1, "parent_id": null, "location": "footer", "audience": "everyone", "label": { "pt": "Legal", "en": "Legal" }, "page": null, "url": null, "new_tab": false },
+    { "id": 2, "parent_id": 1, "location": "footer", "audience": "everyone", "label": { "pt": "Privacidade", "en": "Privacy" }, "page": "privacy", "url": null, "new_tab": false }
+  ]
 }
 ```
 
-A `url` of `null` is a heading that only holds its `children`. Open the URLs in the browser. The web app's own screens (dashboard, lists...) are left out: the app has its own.
+- `texts` are the shipped texts with the backoffice's edits on top. `pages[].content` is HTML, already passed through the editor's renderer. Titles, texts and labels are given for every active language.
+- `menu` is flat and in order. `location` is `navbar`, `user_menu` or `footer`; `audience` is `everyone`, `guests`, `members` or `family_admins` and is applied **by the phone**, so it works offline and after signing in or out. An item with a `page` opens that page; with a `url` it opens the browser; with neither it is a heading for the items whose `parent_id` is its `id`. The web app's own screens (dashboard, lists...) are left out, and so are links to unpublished pages or unsafe addresses.
+- `version` fingerprints the content. Send it back as `?version=` and, when nothing changed, the answer is just `{ "version": "...", "unchanged": true }`.
 
 ## Health
 

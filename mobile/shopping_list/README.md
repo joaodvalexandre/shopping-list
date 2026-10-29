@@ -1,6 +1,6 @@
-# Shopping List - mobile app
+# Cestou - mobile app
 
-The Android app of the Shopping List web app (see the [project README](../../README.md)). It signs in with the same account as the web, keeps the family's lists on the phone so it works **offline**, and syncs with the server through the [mobile API](../../docs/api.md).
+The Android app of the Cestou web app (see the [project README](../../README.md)). It signs in with the same account as the web, keeps the family's lists on the phone so it works **offline**, and syncs with the server through the [mobile API](../../docs/api.md).
 
 ## What it does
 
@@ -8,13 +8,17 @@ The Android app of the Shopping List web app (see the [project README](../../REA
 - **First login**: a person on a temporary password (the family name) gets a screen of their own, in the login's style, asking only for the **new password and its confirmation**. The app sends the temporary one it just used, so it is never asked for again.
 - **Same rules as the web**: buttons appear only if the person holds the permission for that list type (add items, edit items, cart and purchase, manage lists), taken from the server's answer. Lists hidden from a person simply do not exist on their phone.
 - **Same look as the web**: Tailwind's grays, white cards with soft shadows, Figtree font, blue/green/orange pill buttons, the sun/moon switch, the language menu, light and dark.
-- **Same wording as the web**: the app reads the web app's own translation files (`assets/lang`), so texts are identical. After changing `resources/lang/*.json` at the project root, run `sh tool/sync_lang.sh`.
+- **A local database of everything**: besides the family's lists, the phone stores the **languages, every text, the content pages (About, Privacy, Terms...) and the menu links** with who each is for, from `GET /api/v1/content`. A fresh install starts from the copy shipped in `assets/content.json`, so even the first launch works offline; the app asks for what changed on start, on resume, on sign-in/out and on pull-to-refresh. Edit a text, page or link in the backoffice and the phones pick it up. After changing them (or `resources/lang/*.json`) on a freshly seeded database, run `sh tool/sync_lang.sh` to refresh the shipped copy.
 - **Offline first**: every edit is applied and stored on the phone at once, and sent with the next sync (soon after an edit, every 30 seconds, when the connection returns, when the app is reopened, or when you pull down / tap the banner). A strip under the top bar says when the phone is offline or changes are waiting.
 - **Conflicts**: per field, last write wins (two phones changing different fields of the same item keep both). What the server refuses (no permission, the list is gone) is undone and explained.
-- **Footer and account menu links** come from the backoffice (Menus), in the app's language, and are kept for offline use. Pages open in the browser.
+- **Footer and account menu links** come from the backoffice (Menus), in the app's language, and are kept in that database. A page opens **inside the app** from the local copy; only a link to an outside address opens the browser.
 - **Export** a list as a markdown checklist to any app, **finish** a list, create/edit lists and choose who a list is hidden from.
 
 Not in the app yet (done on the web): managing family members, list types and permissions. Phone-to-phone sync is planned.
+
+## Name and icon
+
+The app is called **Cestou** (Android id `app.cestou.mobile`). The icon is a basket with a tick; its sources are SVGs in `assets/icon`. To change it: edit them, then `node assets/icon/render.mjs` (needs Chrome; also refreshes the web app's favicon and logos) and `dart run flutter_launcher_icons`.
 
 ## Running it
 

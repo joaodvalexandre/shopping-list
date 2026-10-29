@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import 'content.dart';
 import 'models.dart';
 
 /// Where the phone keeps the family's lists and items, plus a few settings of the
@@ -19,6 +22,12 @@ abstract class LocalStore {
 
   Future<void> setMeta(String key, String? value);
 
+  /// The languages, texts, pages and menu links last fetched (or shipped), or null on a fresh install.
+  /// Public content: signing out does not clear it.
+  Future<ContentSnapshot?> loadContent();
+
+  Future<void> saveContent(ContentSnapshot content);
+
   Future<void> wipe();
 }
 
@@ -32,8 +41,12 @@ class LocalDb implements LocalStore {
   static Future<LocalDb> open({String? path}) async {
     final db = await openDatabase(
       path ?? p.join(await getDatabasesPath(), 'shopping_list.db'),
-      version: 1,
+      version: 2,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createContentTables(db);
+      },
       onCreate: (db, version) async {
+        await _createContentTables(db);
         await db.execute('''
           CREATE TABLE lists (
             uuid TEXT PRIMARY KEY,
@@ -63,7 +76,122 @@ class LocalDb implements LocalStore {
     return LocalDb._(db);
   }
 
+  static Future<void> _createContentTables(Database db) async {
+    await db.execute('CREATE TABLE languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, native_name TEXT NOT NULL, is_default INTEGER NOT NULL, sort INTEGER NOT NULL)');
+    await db.execute('CREATE TABLE texts (locale TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (locale, key))');
+    await db.execute('CREATE TABLE pages (slug TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, sort INTEGER NOT NULL)');
+    await db.execute('''
+      CREATE TABLE menu_items (
+        id INTEGER PRIMARY KEY,
+        parent_id INTEGER,
+        location TEXT NOT NULL,
+        audience TEXT NOT NULL,
+        label TEXT NOT NULL,
+        page TEXT,
+        url TEXT,
+        new_tab INTEGER NOT NULL,
+        sort INTEGER NOT NULL
+      )''');
+    await db.execute('CREATE TABLE content_meta (key TEXT PRIMARY KEY, value TEXT)');
+  }
+
   Future<void> close() => _db.close();
+
+  @override
+  Future<ContentSnapshot?> loadContent() async {
+    final version = await _db.query('content_meta', where: 'key = ?', whereArgs: ['version']);
+    if (version.isEmpty) return null;
+
+    final texts = <String, Map<String, String>>{};
+    for (final row in await _db.query('texts')) {
+      (texts[row['locale'] as String] ??= {})[row['key'] as String] = row['value'] as String;
+    }
+
+    return ContentSnapshot(
+      version: version.first['value'] as String,
+      languages: [
+        for (final row in await _db.query('languages', orderBy: 'sort'))
+          ContentLanguage(
+            code: row['code'] as String,
+            name: row['name'] as String,
+            nativeName: row['native_name'] as String,
+            isDefault: row['is_default'] == 1,
+          ),
+      ],
+      texts: texts,
+      pages: [
+        for (final row in await _db.query('pages', orderBy: 'sort'))
+          ContentPage(
+            slug: row['slug'] as String,
+            title: _decodeTexts(row['title']),
+            content: _decodeTexts(row['content']),
+          ),
+      ],
+      menu: [
+        for (final row in await _db.query('menu_items', orderBy: 'sort'))
+          MenuEntry(
+            id: row['id'] as int,
+            parentId: row['parent_id'] as int?,
+            location: row['location'] as String,
+            audience: row['audience'] as String,
+            label: _decodeTexts(row['label']),
+            page: row['page'] as String?,
+            url: row['url'] as String?,
+            newTab: row['new_tab'] == 1,
+          ),
+      ],
+    );
+  }
+
+  /// Replaces all the content at once, all or nothing.
+  @override
+  Future<void> saveContent(ContentSnapshot content) async {
+    await _db.transaction((txn) async {
+      for (final table in ['languages', 'texts', 'pages', 'menu_items', 'content_meta']) {
+        await txn.delete(table);
+      }
+
+      final batch = txn.batch();
+      var sort = 0;
+      for (final language in content.languages) {
+        batch.insert('languages', {
+          'code': language.code,
+          'name': language.name,
+          'native_name': language.nativeName,
+          'is_default': language.isDefault ? 1 : 0,
+          'sort': sort++,
+        });
+      }
+      for (final locale in content.texts.entries) {
+        for (final text in locale.value.entries) {
+          batch.insert('texts', {'locale': locale.key, 'key': text.key, 'value': text.value});
+        }
+      }
+      sort = 0;
+      for (final page in content.pages) {
+        batch.insert('pages', {'slug': page.slug, 'title': jsonEncode(page.title), 'content': jsonEncode(page.content), 'sort': sort++});
+      }
+      sort = 0;
+      for (final entry in content.menu) {
+        batch.insert('menu_items', {
+          'id': entry.id,
+          'parent_id': entry.parentId,
+          'location': entry.location,
+          'audience': entry.audience,
+          'label': jsonEncode(entry.label),
+          'page': entry.page,
+          'url': entry.url,
+          'new_tab': entry.newTab ? 1 : 0,
+          'sort': sort++,
+        });
+      }
+      batch.insert('content_meta', {'key': 'version', 'value': content.version});
+      await batch.commit(noResult: true);
+    });
+  }
+
+  static Map<String, String> _decodeTexts(Object? raw) =>
+      (jsonDecode(raw as String) as Map<String, dynamic>).map((k, v) => MapEntry(k, v.toString()));
 
   /// Every list with its items.
   @override

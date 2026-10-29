@@ -5,6 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
+        @include('partials.head-icons')
+
         <title>{{ $attributes->get('title') ?? __('login') }}</title>
 
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -30,7 +32,7 @@
 
             <div class="w-full {{ $attributes->has('wide') ? 'sm:max-w-3xl' : 'sm:max-w-md' }} p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg text-gray-900 dark:text-gray-100">
                 <div class="flex justify-center mb-4">
-                    <x-custom-icon package="mingcute" icon="shopping-cart-2-line" size="48" class="text-gray-800 dark:text-gray-200"/>
+                    <img src="{{ asset('img/logo.svg') }}" alt="{{ config('app.name') }}" width="56" height="56" class="rounded-xl">
                 </div>
                 {{ $slot }}
             </div>

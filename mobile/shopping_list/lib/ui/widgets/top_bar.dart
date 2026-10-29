@@ -9,15 +9,14 @@ import '../screens/settings_screen.dart';
 import '../theme.dart';
 import 'common.dart';
 
-/// The web app's cart logo.
+/// The app's logo: the basket, as on the launcher icon and the web.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 32});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) =>
-      Icon(Icons.shopping_cart_outlined, size: size, color: context.isDark ? Tw.gray200 : Tw.gray800);
+  Widget build(BuildContext context) => Image.asset('assets/icon/logo.png', width: size, height: size, filterQuality: FilterQuality.medium);
 }
 
 /// The web's sliding sun/moon switch.
@@ -60,8 +59,6 @@ class ThemeToggle extends StatelessWidget {
 class LanguageMenu extends StatelessWidget {
   const LanguageMenu({super.key});
 
-  static const _flags = {'pt': '🇵🇹', 'en': '🇬🇧'};
-
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
@@ -71,17 +68,17 @@ class LanguageMenu extends StatelessWidget {
       onSelected: settings.setLanguage,
       position: PopupMenuPosition.under,
       itemBuilder: (_) => [
-        for (final entry in SettingsState.supportedLanguages.entries)
+        for (final language in settings.languages)
           CheckedPopupMenuItem(
-            value: entry.key,
-            checked: entry.key == settings.language,
-            child: Text('${_flags[entry.key] ?? ''}  ${entry.value}'),
+            value: language.code,
+            checked: language.code == settings.language,
+            child: Text('${SettingsState.flagOf(language.code)}  ${language.nativeName}'),
           ),
       ],
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(_flags[settings.language] ?? '🌐', style: const TextStyle(fontSize: 22)),
+          Text(SettingsState.flagOf(settings.language), style: const TextStyle(fontSize: 22)),
           const Icon(Icons.keyboard_arrow_down, size: 18),
         ]),
       ),

@@ -31,7 +31,7 @@ new class extends Component
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" wire:navigate>
-                        <x-custom-icon package="mingcute" icon="shopping-cart-2-line" size="38" class="text-gray-800 dark:text-gray-200"/>
+                        <img src="{{ asset('img/logo.svg') }}" alt="{{ config('app.name') }}" width="38" height="38" class="rounded-lg">
                     </a>
                 </div>
 

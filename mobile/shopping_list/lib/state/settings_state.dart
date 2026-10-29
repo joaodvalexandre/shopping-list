@@ -1,28 +1,34 @@
-import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/content.dart';
+import 'content_service.dart';
 
 /// Where the app talks to, unless the person types another server. Override
 /// per build with --dart-define=API_BASE_URL=https://my.server
 const defaultServerUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8000');
 
-/// The app's own settings: language, appearance and server. Also the source of
-/// every text, loaded from the same JSON files as the web app (assets/lang)
-/// so the wording is identical on both.
+/// The app's own settings: language, appearance and server. Also the source of every
+/// text, taken from the local copy of the web app's own texts ([ContentService]) so the
+/// wording is identical on both, and edits made in the backoffice reach the phone.
 class SettingsState extends ChangeNotifier {
-  SettingsState(this._prefs);
+  SettingsState(this._prefs, this.content) {
+    _language = _initialLanguage();
+    // New texts, or a language added or removed, change what is on screen
+    content.addListener(_contentChanged);
+  }
 
   final SharedPreferences _prefs;
+  final ContentService content;
 
-  static const supportedLanguages = {'pt': 'Português', 'en': 'English'};
   static const fallbackLanguage = 'en';
 
-  final Map<String, Map<String, String>> _texts = {};
+  /// Flags next to the language names; any other language gets a globe.
+  static const _flags = {'pt': '🇵🇹', 'en': '🇬🇧', 'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'it': '🇮🇹', 'nl': '🇳🇱'};
 
-  String _language = 'pt';
+  late String _language;
   ThemeMode _themeMode = ThemeMode.system;
   String _serverUrl = defaultServerUrl;
 
@@ -31,19 +37,13 @@ class SettingsState extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   String get serverUrl => _serverUrl;
 
-  static Future<SettingsState> load() async {
-    final state = SettingsState(await SharedPreferences.getInstance());
+  /// The languages the server offers.
+  List<ContentLanguage> get languages => content.languages;
 
-    for (final code in supportedLanguages.keys) {
-      final raw = await rootBundle.loadString('assets/lang/$code.json');
-      state._texts[code] = (jsonDecode(raw) as Map<String, dynamic>).map((k, v) => MapEntry(k, v.toString()));
-    }
+  static String flagOf(String code) => _flags[code] ?? '🌐';
 
-    final saved = state._prefs.getString('language');
-    final device = ui.PlatformDispatcher.instance.locale.languageCode;
-    state._language = supportedLanguages.containsKey(saved)
-        ? saved!
-        : (supportedLanguages.containsKey(device) ? device : 'pt');
+  static Future<SettingsState> load(ContentService content) async {
+    final state = SettingsState(await SharedPreferences.getInstance(), content);
 
     state._themeMode = switch (state._prefs.getString('theme')) {
       'dark' => ThemeMode.dark,
@@ -55,16 +55,35 @@ class SettingsState extends ChangeNotifier {
     return state;
   }
 
+  String _initialLanguage() {
+    final saved = _prefs.getString('language');
+    final device = ui.PlatformDispatcher.instance.locale.languageCode;
+
+    return content.hasLanguage(saved) ? saved! : (content.hasLanguage(device) ? device : content.defaultLanguage);
+  }
+
+  void _contentChanged() {
+    // The language the person chose was taken off the server
+    if (!content.hasLanguage(_language)) _language = content.defaultLanguage;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    content.removeListener(_contentChanged);
+    super.dispose();
+  }
+
   /// A text of the app in the chosen language ("Pending", "Entrar"...).
   /// `:name` placeholders are replaced from [params].
   String t(String key, [Map<String, Object> params = const {}]) {
-    var text = _texts[_language]?[key] ?? _texts[fallbackLanguage]?[key] ?? key;
+    var text = content.text(_language, key) ?? content.text(fallbackLanguage, key) ?? key;
     params.forEach((name, value) => text = text.replaceAll(':$name', value.toString()));
     return text;
   }
 
   Future<void> setLanguage(String code) async {
-    if (!supportedLanguages.containsKey(code) || code == _language) return;
+    if (!content.hasLanguage(code) || code == _language) return;
     _language = code;
     await _prefs.setString('language', code);
     notifyListeners();

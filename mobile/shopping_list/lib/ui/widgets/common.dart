@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/api_client.dart';
+import '../../state/content_service.dart';
 import '../../state/settings_state.dart';
+import '../../state/sync_service.dart';
 import '../theme.dart';
 
 extension TextsOnContext on BuildContext {
@@ -197,3 +200,12 @@ void toast(BuildContext context, String message) {
 /// Room around the content of every scrollable page: a gap under the header, and enough
 /// at the bottom that the last card is never against (or under) the navigation bar.
 const EdgeInsets scrollPadding = EdgeInsets.fromLTRB(12, 20, 12, 40);
+
+/// Pull everything fresh: the family's lists, and the texts, pages and links from the server.
+Future<void> syncEverything(BuildContext context) {
+  final content = context.read<ContentService>();
+  final api = context.read<ApiClient>();
+  final sync = context.read<SyncService>();
+
+  return Future.wait([sync.sync(), content.refresh(api)]);
+}

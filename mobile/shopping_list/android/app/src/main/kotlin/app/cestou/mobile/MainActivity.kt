@@ -1,4 +1,4 @@
-package com.example.shopping_list
+package app.cestou.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 
