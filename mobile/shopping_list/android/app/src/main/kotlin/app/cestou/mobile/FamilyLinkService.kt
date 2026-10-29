@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
 
 /**
  * Keeps the app alive while the phone is locked, the app is off screen, or it was closed, so the
@@ -16,6 +17,8 @@ import android.os.IBinder
  * notification that stays visible: this is it. It does nothing else; the connection itself is the app's.
  */
 class FamilyLinkService : Service() {
+    private var closeLabel = "Close"
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -38,7 +41,8 @@ class FamilyLinkService : Service() {
     }
 
     /** New words for the notification, while the service runs (no need to start anything again). */
-    fun refresh(title: String, text: String) {
+    fun refresh(title: String, text: String, close: String? = null) {
+        if (close != null) closeLabel = close
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, build(title, text))
     }
 
@@ -49,8 +53,19 @@ class FamilyLinkService : Service() {
             return START_NOT_STICKY
         }
 
+        // "Close" on the notification: the app stops completely, with its connections and its checks, until
+        // it is opened again (which starts it all again). The mark keeps the scheduled checks quiet meanwhile.
+        if (intent?.action == ACTION_QUIT) {
+            getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE).edit().putBoolean("flutter.closed_by_user", true).commit()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            Process.killProcess(Process.myPid())
+            return START_NOT_STICKY
+        }
+
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Cestou"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
+        intent?.getStringExtra(EXTRA_CLOSE)?.let { closeLabel = it }
         val notification = build(title, text)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -81,8 +96,17 @@ class FamilyLinkService : Service() {
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, CHANNEL_ID) else Notification.Builder(this)
 
+        val quit = PendingIntent.getService(
+            this,
+            1,
+            Intent(this, FamilyLinkService::class.java).setAction(ACTION_QUIT),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        @Suppress("DEPRECATION")
         return builder
             .setSmallIcon(R.drawable.ic_stat_notify)
+            .addAction(R.drawable.ic_stat_notify, closeLabel, quit)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(open)
@@ -97,6 +121,8 @@ class FamilyLinkService : Service() {
         const val ACTION_STOP = "app.cestou.mobile.STOP_FAMILY_LINK"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_CLOSE = "close"
+        const val ACTION_QUIT = "app.cestou.mobile.QUIT"
         private const val CHANNEL_ID = "family_link"
         private const val NOTIFICATION_ID = 7001
     }

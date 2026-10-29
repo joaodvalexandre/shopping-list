@@ -51,7 +51,6 @@ class ListDetailScreen extends StatelessWidget {
       child: Scaffold(
       appBar: AppBar(
         title: Text(list.name, style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: Column(
         children: [

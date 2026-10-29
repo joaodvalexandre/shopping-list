@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../data/repository.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/top_bar.dart';
 
 /// Create or edit a list: name, type (only when creating: a list never changes type),
 /// and who it is hidden from (for surprises), exactly as on the web.
@@ -68,7 +67,6 @@ class _ListFormScreenState extends State<ListFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t(_editing ? 'edit' : 'new_list'), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: SingleChildScrollView(
         padding: scrollPadding,

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/repository.dart';
 import '../widgets/common.dart';
-import '../widgets/top_bar.dart';
 
 /// Add or edit an item: name and quantity, as on the web.
 class ItemFormScreen extends StatefulWidget {
@@ -62,7 +61,6 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t(_editing ? 'edit' : 'new_item'), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: SingleChildScrollView(
         padding: scrollPadding,

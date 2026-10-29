@@ -466,5 +466,10 @@
     "app_keep_running": "Continuar a correr em segundo plano",
     "app_keep_running_help": "Sabes logo o que os outros fazem, mesmo com a app fechada, em vez de a cada 15 minutos. Fica uma notificação enquanto corre.",
     "app_background_allowed": "Pode correr em segundo plano",
-    "app_nearby_help_local": "Procura os outros telemóveis da família por perto e mantém-nos em sintonia, por Bluetooth. Mantém o Bluetooth ligado."
+    "app_nearby_help_local": "Procura os outros telemóveis da família por perto e mantém-nos em sintonia, por Bluetooth. Mantém o Bluetooth ligado.",
+    "app_channel_added": "Itens e listas novos",
+    "app_channel_cart": "Carrinho",
+    "app_channel_bought": "Compras",
+    "app_channel_changes": "Alterações e remoções",
+    "app_link_close": "Fechar o Cestou"
 }

@@ -65,8 +65,9 @@ class FamilyLink {
     _text = text;
 
     // Already showing: only the words change (starting a service from the background is not always allowed)
-    if (wasRunning && await _call('update', {'title': title, 'text': text}) == true) return;
-    await _call('start', {'title': title, 'text': text});
+    final arguments = {'title': title, 'text': text, 'close': settings.t('app_link_close')};
+    if (wasRunning && await _call('update', arguments) == true) return;
+    await _call('start', arguments);
   }
 
   /// Is the app allowed to run in the background without being stopped to save battery? (Android only.)

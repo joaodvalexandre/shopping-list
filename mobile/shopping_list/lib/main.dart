@@ -48,6 +48,7 @@ Future<void> main() async {
   // Notifications about what others did: the plugin, and the service that asks the server
   final sink = await LocalNoticeSink.create(onTap: (uuid) => openListFromNotification(uuid, repository, auth));
   final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(closedByUserKey, false);
   final notifications = NotificationService(store: db, prefs: prefs, content: content, sink: sink);
 
   // Phones of the family nearby: who this phone is, and the signed credential that proves it

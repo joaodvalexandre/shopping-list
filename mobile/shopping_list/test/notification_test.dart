@@ -32,6 +32,7 @@ final texts = {
     'app_notice_item_purchased': ':name bought :item',
     'app_notice_item_purchased_many': ':name bought :count items',
     'app_notice_list_created': ':name created this list',
+    'app_channel_bought': 'Purchases',
     'app_notice_item_added_qty': ':name added :item (x:quantity)',
     'app_notice_item_returned': ':name took :item out of the cart',
     'app_notice_item_returned_many': ':name took :count items out of the cart',
@@ -229,7 +230,10 @@ void main() {
     test('with the app on screen it is a banner in the app, with it off screen a phone notification', () async {
       await setUpService();
       final banners = <ActivityNotice>[];
-      service.onInApp = banners.addAll;
+      service.onInApp = (notices) {
+        banners.addAll(notices);
+        return notices;
+      };
 
       await service.deliver([made('item_added', item: 'Milk', quantity: 1)], onScreen: true);
       expect(banners.single.title, 'Barbecue');
@@ -244,7 +248,10 @@ void main() {
     test('only what the person asked to hear about, and each channel can be switched off', () async {
       await setUpService(values: {'notify_cart': false, 'notify_in_app': false});
       final banners = <ActivityNotice>[];
-      service.onInApp = banners.addAll;
+      service.onInApp = (notices) {
+        banners.addAll(notices);
+        return notices;
+      };
 
       // the cart is not wanted; the banner is switched off
       expect(await service.deliver([made('item_in_cart', item: 'Milk')], onScreen: false), 0);
@@ -254,6 +261,44 @@ void main() {
       // adding is wanted, as a phone notification
       expect(await service.deliver([made('item_added', item: 'Milk')], onScreen: false), 1);
       expect(sink.shown.single.lines, ['Bia added Milk']);
+    });
+  });
+
+  group('a sound for each kind of thing', () {
+    ActivityEvent made(String kind) => ActivityEvent(id: 0, kind: kind, actor: 'Bia', listUuid: 'list-1', list: 'Barbecue', item: 'Milk', quantity: 1);
+
+    test('each kind has its own sound, and the cart and the purchase are not the same', () {
+      expect(NotificationService.soundOf('item_added'), 'added');
+      expect(NotificationService.soundOf('list_created'), 'added');
+      expect(NotificationService.soundOf('item_in_cart'), 'cart');
+      expect(NotificationService.soundOf('item_returned'), 'cart');
+      expect(NotificationService.soundOf('item_purchased'), 'bought');
+      expect(NotificationService.soundOf('item_changed'), 'changes');
+      expect(NotificationService.soundOf('item_removed'), 'changes');
+      expect(NotificationService.soundOf('list_removed'), 'changes');
+      expect(NotificationService.sounds.toSet().length, 4);
+    });
+
+    test('a phone notification asks for the sound (and channel) of what happened', () async {
+      await setUpService();
+
+      await service.deliver([made('item_purchased')], onScreen: false);
+      await service.deliver([made('item_removed')], onScreen: false);
+
+      expect(sink.shown.map((n) => n.sound), ['bought', 'changes']);
+      expect(sink.shown.first.channelName, 'Purchases');
+    });
+
+    test('a banner in the app plays the sound, but not when it was not shown', () async {
+      await setUpService();
+
+      service.onInApp = (notices) => notices;
+      await service.deliver([made('item_in_cart')], onScreen: true);
+      expect(sink.played, ['cart']);
+
+      service.onInApp = (notices) => const []; // (the person is looking at that list)
+      await service.deliver([made('item_added')], onScreen: true);
+      expect(sink.played, ['cart']);
     });
   });
 }

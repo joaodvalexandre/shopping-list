@@ -15,6 +15,10 @@ import 'settings_state.dart';
 const _taskName = 'check-activity';
 const _uniqueName = 'cestou-activity';
 
+/// Set (by the "Close" button of the notification that keeps the app alive) when the person closed the
+/// app completely: nothing runs, not even the scheduled checks, until they open the app again.
+const closedByUserKey = 'closed_by_user';
+
 /// Starts Android's scheduled work, which runs [backgroundDispatcher] about every 15 minutes
 /// (the shortest it allows) while there is a connection, even with the app closed.
 Future<void> scheduleBackgroundChecks() async {
@@ -58,6 +62,7 @@ void backgroundDispatcher() {
 Future<int> runBackgroundCheck() async {
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool(NotificationService.enabledKey) == false) return 0;
+  if (prefs.getBool(closedByUserKey) == true) return 0;
 
   final token = await const FlutterSecureStorage().read(key: AuthState.tokenKey);
   if (token == null) return 0;

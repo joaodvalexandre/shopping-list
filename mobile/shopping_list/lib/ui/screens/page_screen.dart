@@ -7,7 +7,6 @@ import '../../state/content_service.dart';
 import '../../state/settings_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/top_bar.dart';
 
 /// A content page (About, Privacy policy, Terms...) read from the app's own copy, in the
 /// chosen language, so it opens with no connection.
@@ -26,7 +25,6 @@ class PageScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(page == null ? '' : content.titleOf(page, language), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: ListView(
         padding: scrollPadding,

@@ -317,16 +317,13 @@ class PageHeader extends StatelessWidget {
   }
 }
 
-/// Top bar of the main screens: logo, switches and account.
+/// Top bar of the main screens: logo and account (language and theme are in Settings).
 PreferredSizeWidget appBar(BuildContext context, {List<Widget> extra = const []}) {
   return AppBar(
     titleSpacing: 12,
     title: const Align(alignment: Alignment.centerLeft, child: AppLogo(size: 34)),
     actions: [
       ...extra,
-      const LanguageMenu(),
-      const ThemeToggle(),
-      const SizedBox(width: 4),
       const UserMenu(),
       const SizedBox(width: 6),
     ],

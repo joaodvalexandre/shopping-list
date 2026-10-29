@@ -7,7 +7,6 @@ import '../../data/repository.dart';
 import '../../peer/nearby_service.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/top_bar.dart';
 
 /// One person of an offline family, laid out like the member form of a server family: who they are,
 /// their role (admin or member) and what they may do in each list type. An admin changes these;
@@ -84,7 +83,6 @@ class _LocalMemberScreenState extends State<LocalMemberScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t('app_edit_member'), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: ListView(
         padding: scrollPadding,

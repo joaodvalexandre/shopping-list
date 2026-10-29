@@ -17,14 +17,15 @@ class InAppBanner {
 
   static const _stays = Duration(seconds: 6);
 
-  static void show(
+  /// Shows the banner; answers the notices it showed (none when the person is looking at the list).
+  static List<ActivityNotice> show(
     List<ActivityNotice> notices, {
     required GlobalKey<NavigatorState> navigatorKey,
     required void Function(String listUuid) open,
   }) {
     final visible = notices.where((notice) => notice.listUuid != viewing.value).toList();
     final overlay = navigatorKey.currentState?.overlay;
-    if (visible.isEmpty || overlay == null) return;
+    if (visible.isEmpty || overlay == null) return const [];
 
     dismiss();
     _entry = OverlayEntry(
@@ -39,6 +40,7 @@ class InAppBanner {
     );
     overlay.insert(_entry!);
     _timer = Timer(_stays, dismiss);
+    return visible;
   }
 
   static void dismiss() {

@@ -60,7 +60,6 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t('settings'), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: ListView(
         padding: scrollPadding,
@@ -404,7 +403,7 @@ class _PasswordScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.t('app_change_password'), style: const TextStyle(fontSize: 18)), actions: const [ThemeToggle(), SizedBox(width: 12)]),
+      appBar: AppBar(title: Text(context.t('app_change_password'), style: const TextStyle(fontSize: 18))),
       body: ListView(padding: scrollPadding, children: const [Panel(padding: EdgeInsets.all(20), child: PasswordForm())]),
     );
   }
@@ -428,7 +427,7 @@ class _DevicesScreenState extends State<_DevicesScreen> {
     final muted = context.isDark ? Tw.gray400 : Tw.gray500;
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.t('app_devices'), style: const TextStyle(fontSize: 18)), actions: const [ThemeToggle(), SizedBox(width: 12)]),
+      appBar: AppBar(title: Text(context.t('app_devices'), style: const TextStyle(fontSize: 18))),
       body: ListView(
         padding: scrollPadding,
         children: [

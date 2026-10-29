@@ -2,6 +2,9 @@ package app.cestou.mobile
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -36,10 +39,35 @@ class MainActivity : FlutterActivity() {
             val engine = FlutterEngine(app)
             GeneratedPluginRegistrant.registerWith(engine)
             registerChannels(engine, app)
+            registerSound(engine, app)
             engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
 
             cache.put(ENGINE_ID, engine)
             return engine
+        }
+
+        // The sound of a banner inside the app (a phone notification brings its own): `res/raw/sound_<kind>.wav`,
+        // played as a notification sound, so it follows the phone's notification volume and silent mode
+        private fun registerSound(engine: FlutterEngine, app: Context) {
+            MethodChannel(engine.dartExecutor.binaryMessenger, "app.cestou.mobile/sound").setMethodCallHandler { call, result ->
+                if (call.method != "play") return@setMethodCallHandler result.notImplemented()
+
+                val id = app.resources.getIdentifier("sound_" + call.argument<String>("sound"), "raw", app.packageName)
+                if (id == 0) return@setMethodCallHandler result.success(false)
+
+                try {
+                    val attributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    val player = MediaPlayer.create(app, id, attributes, AudioManager.AUDIO_SESSION_ID_GENERATE)
+                    player.setOnCompletionListener { it.release() }
+                    player.start()
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
         }
 
         // The app asks for the notification that keeps it alive in the background (or to drop it)
@@ -50,6 +78,7 @@ class MainActivity : FlutterActivity() {
                         val intent = Intent(app, FamilyLinkService::class.java)
                             .putExtra(FamilyLinkService.EXTRA_TITLE, call.argument<String>("title"))
                             .putExtra(FamilyLinkService.EXTRA_TEXT, call.argument<String>("text"))
+                            .putExtra(FamilyLinkService.EXTRA_CLOSE, call.argument<String>("close"))
 
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) app.startForegroundService(intent) else app.startService(intent)
@@ -59,7 +88,7 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "update" -> {
-                        FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Cestou", call.argument<String>("text") ?: "")
+                        FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Cestou", call.argument<String>("text") ?: "", call.argument<String>("close"))
                         result.success(FamilyLinkService.instance != null)
                     }
                     "stop" -> {

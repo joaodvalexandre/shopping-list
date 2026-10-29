@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The notification sounds are found by name, so the build must not drop them as unused -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/sound_*" />

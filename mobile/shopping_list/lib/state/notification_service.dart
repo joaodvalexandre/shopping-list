@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart' show Color;
+import 'package:flutter/services.dart' show MethodChannel, MissingPluginException, PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,7 +15,20 @@ abstract class NoticeSink {
   Future<bool> requestPermission();
 
   /// [lines] are the separate things that happened (shown one under the other when there are several).
-  Future<void> show({required int id, required String title, required String body, required String payload, List<String> lines = const []});
+  /// [sound] says what kind of thing it was (see [NotificationService.soundOf]): each kind has its own
+  /// sound, and its own channel in Android's notification settings, named [channelName].
+  Future<void> show({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+    List<String> lines = const [],
+    String sound = 'added',
+    String channelName = '',
+  });
+
+  /// Play the sound of one kind of thing (for a banner in the app, which makes no notification of its own).
+  Future<void> play(String sound);
 }
 
 /// Tells people what others did on the family's lists, as phone notifications.
@@ -45,6 +59,16 @@ class NotificationService {
     'list_removed': 'notify_changes',
   };
 
+  /// Which of the app's sounds goes with a kind of thing: a new item or list, the cart, a purchase, or a change.
+  static const sounds = ['added', 'cart', 'bought', 'changes'];
+
+  static String soundOf(String kind) => switch (kind) {
+        'item_added' || 'list_created' => 'added',
+        'item_in_cart' || 'item_returned' => 'cart',
+        'item_purchased' => 'bought',
+        _ => 'changes',
+      };
+
   /// A banner inside the app, for what happens while the person is using it (on another screen than the list).
   static const inAppKey = 'notify_in_app';
 
@@ -52,8 +76,9 @@ class NotificationService {
 
   bool wantsKind(String kind) => prefs.getBool(kindPrefs[kind] ?? 'notify_added') ?? true;
 
-  /// Where an in-app banner goes (the screen shows it).
-  void Function(List<ActivityNotice> notices)? onInApp;
+  /// Where an in-app banner goes (the screen shows it). Answers which of the notices it did show:
+  /// not the one for the list the person is looking at.
+  List<ActivityNotice> Function(List<ActivityNotice> notices)? onInApp;
 
   /// How far into the server's feed this phone has got (cleared on sign-out with the rest of the local data).
   static const cursorKey = 'activity_cursor';
@@ -115,7 +140,8 @@ class NotificationService {
 
     if (onScreen) {
       if (!inAppEnabled || onInApp == null) return 0;
-      onInApp!(notices);
+      final shown = onInApp!(notices);
+      if (shown.isNotEmpty) await sink.play(soundOf(shown.last.kind));
       return notices.length;
     }
 
@@ -128,6 +154,8 @@ class NotificationService {
         body: notice.body,
         payload: notice.listUuid,
         lines: notice.lines,
+        sound: soundOf(notice.kind),
+        channelName: _text('app_channel_${soundOf(notice.kind)}', const {}),
       );
     }
     return notices.length;
@@ -140,7 +168,25 @@ class LocalNoticeSink implements NoticeSink {
 
   final FlutterLocalNotificationsPlugin _plugin;
 
-  static const channelId = 'activity';
+  static const _audio = MethodChannel('app.cestou.mobile/sound');
+
+  /// One channel for each kind of thing, so each has its own sound (and the person can change either
+  /// in Android's settings). The sound files are `res/raw/sound_<kind>.wav`.
+  static String channelOf(String sound) => 'cestou_$sound';
+
+  static const _channelNames = {
+    'added': 'New items and lists',
+    'cart': 'Cart',
+    'bought': 'Purchases',
+    'changes': 'Changes and removals',
+  };
+
+  static AndroidNotificationChannel _channel(String sound, String name) => AndroidNotificationChannel(
+        channelOf(sound),
+        name,
+        importance: Importance.high,
+        sound: RawResourceAndroidNotificationSound('sound_$sound'),
+      );
 
   /// [onTap] gets the payload (a list's uuid) when someone taps a notification.
   static Future<LocalNoticeSink> create({void Function(String payload)? onTap}) async {
@@ -153,6 +199,13 @@ class LocalNoticeSink implements NoticeSink {
         if (payload != null && payload.isNotEmpty) onTap?.call(payload);
       },
     );
+
+    final android = plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    // (the one channel there used to be had a plain sound and did not pop up on every phone)
+    await android?.deleteNotificationChannel(channelId: 'activity');
+    for (final sound in NotificationService.sounds) {
+      await android?.createNotificationChannel(_channel(sound, _channelNames[sound]!));
+    }
 
     return LocalNoticeSink._(plugin);
   }
@@ -170,7 +223,26 @@ class LocalNoticeSink implements NoticeSink {
   }
 
   @override
-  Future<void> show({required int id, required String title, required String body, required String payload, List<String> lines = const []}) {
+  Future<void> play(String sound) async {
+    try {
+      await _audio.invokeMethod('play', {'sound': sound});
+    } on MissingPluginException {
+      // (not on the app's own screen engine: no sound, no harm)
+    } on PlatformException {
+      // a sound that cannot play is not worth an error
+    }
+  }
+
+  @override
+  Future<void> show({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+    List<String> lines = const [],
+    String sound = 'added',
+    String channelName = '',
+  }) {
     return _plugin.show(
       id: id,
       title: title,
@@ -178,10 +250,17 @@ class LocalNoticeSink implements NoticeSink {
       payload: payload,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          channelId,
-          'Cestou',
+          channelOf(sound),
+          channelName.isEmpty ? (_channelNames[sound] ?? 'Cestou') : channelName,
+          // high is what makes it drop down from the top of the screen, with its sound
           importance: Importance.high,
           priority: Priority.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound('sound_$sound'),
+          enableVibration: true,
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.public,
+          ticker: title,
           color: const Color(0xFF16A34A),
           // one thing: its sentence; several: a line for each, under the list's name
           styleInformation: lines.length > 1

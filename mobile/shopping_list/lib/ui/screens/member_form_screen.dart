@@ -8,7 +8,6 @@ import '../../data/repository.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/family_dialogs.dart';
-import '../widgets/top_bar.dart';
 
 /// Add a member or edit one: name, email, role and, for a plain member, what they may do
 /// with each type of list. The same form as the web's.
@@ -111,7 +110,6 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t(_editing ? 'app_edit_member' : 'new_member'), style: const TextStyle(fontSize: 18)),
-        actions: const [ThemeToggle(), SizedBox(width: 12)],
       ),
       body: SingleChildScrollView(
         padding: scrollPadding,
