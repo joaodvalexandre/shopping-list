@@ -12,7 +12,7 @@ it('sends guests to the backoffice login', function () {
 it('keeps family accounts out of the backoffice, whatever their role', function () {
     $f = makeFamily();
 
-    foreach (['/admin', '/admin/families', '/admin/users', '/admin/admins', '/admin/languages', '/admin/translations', '/admin/pages'] as $url) {
+    foreach (['/admin', '/admin/families', '/admin/users', '/admin/admins', '/admin/languages', '/admin/translations', '/admin/pages', '/admin/menu-items', '/admin/roles'] as $url) {
         $this->actingAs($f['admin'])->get($url)->assertRedirect('/admin/login');
     }
 
@@ -43,7 +43,7 @@ it('opens every backoffice screen for an administrator', function () {
         '/admin/users', '/admin/users/create', "/admin/users/{$f['admin']->id}/edit",
         '/admin/admins', '/admin/admins/create',
         '/admin/languages', '/admin/languages/create',
-        '/admin/translations', '/admin/pages', '/admin/pages/create'] as $url) {
+        '/admin/translations', '/admin/pages', '/admin/pages/create', '/admin/menu-items', '/admin/menu-items/create'] as $url) {
         $this->get($url)->assertOk();
     }
 });

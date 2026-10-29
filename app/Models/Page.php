@@ -4,8 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A simple content page (about, privacy, help...) with a title and text per
@@ -13,7 +12,7 @@ use Illuminate\Support\Collection;
  */
 class Page extends Model
 {
-    protected $fillable = ['slug', 'title', 'content', 'is_published', 'show_in_footer', 'sort'];
+    protected $fillable = ['slug', 'title', 'content', 'is_published', 'sort'];
 
     protected function casts(): array
     {
@@ -21,7 +20,6 @@ class Page extends Model
             'title' => 'array',
             'content' => 'array',
             'is_published' => 'boolean',
-            'show_in_footer' => 'boolean',
         ];
     }
 
@@ -55,18 +53,8 @@ class Page extends Model
         return collect($texts)->first(fn ($text) => filled($text));
     }
 
-    /**
-     * Published pages that appear in the footer. Empty (never an error) when
-     * the table does not exist yet.
-     *
-     * @return Collection<int, Page>
-     */
-    public static function footerLinks(): Collection
+    public function menuItems(): HasMany
     {
-        try {
-            return static::published()->where('show_in_footer', true)->orderBy('sort')->orderBy('slug')->get();
-        } catch (QueryException) {
-            return collect();
-        }
+        return $this->hasMany(MenuItem::class);
     }
 }

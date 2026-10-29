@@ -4,6 +4,7 @@ use App\Filament\Resources\Pages\Pages\CreatePage;
 use App\Filament\Resources\Pages\Pages\EditPage;
 use App\Filament\Resources\Pages\Pages\ListPages;
 use App\Models\Language;
+use App\Models\MenuItem;
 use App\Models\Page;
 use Database\Seeders\LanguageSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -20,7 +21,6 @@ function publishedPage(array $attributes = []): Page
         'title' => ['pt' => 'Sobre', 'en' => 'About'],
         'content' => ['pt' => '<p>Texto em português</p>', 'en' => '<p>English text</p>'],
         'is_published' => true,
-        'show_in_footer' => true,
     ]);
 }
 
@@ -46,10 +46,13 @@ it('falls back to the default language when a translation is missing', function 
     $this->withSession(['locale' => 'en'])->get('/p/only-pt')->assertOk()->assertSee('Só português')->assertSee('Apenas PT');
 });
 
-it('links published footer pages from the sign-in page and the app', function () {
-    publishedPage(['slug' => 'privacy', 'title' => ['pt' => 'Privacidade', 'en' => 'Privacy']]);
-    publishedPage(['slug' => 'draft', 'title' => ['pt' => 'Rascunho', 'en' => 'Draft'], 'is_published' => false]);
-    publishedPage(['slug' => 'hidden-link', 'title' => ['pt' => 'Escondida', 'en' => 'Hidden'], 'show_in_footer' => false]);
+it('links the pages put in the footer from the sign-in page and the app', function () {
+    $privacy = publishedPage(['slug' => 'privacy', 'title' => ['pt' => 'Privacidade', 'en' => 'Privacy']]);
+    $draft = publishedPage(['slug' => 'draft', 'title' => ['pt' => 'Rascunho', 'en' => 'Draft'], 'is_published' => false]);
+    publishedPage(['slug' => 'hidden-link', 'title' => ['pt' => 'Escondida', 'en' => 'Hidden']]);
+
+    MenuItem::create(['location' => 'footer', 'page_id' => $privacy->id]);
+    MenuItem::create(['location' => 'footer', 'page_id' => $draft->id]);   // a draft is never linked
 
     $this->get('/login')->assertOk()->assertSee('Privacidade')->assertDontSee('Rascunho')->assertDontSee('Escondida');
 

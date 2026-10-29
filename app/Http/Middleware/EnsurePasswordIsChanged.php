@@ -8,14 +8,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Accounts are created with a temporary password; until the member picks
- * their own, the only reachable page is their settings.
+ * their own, the only reachable page is the one where they choose it.
  */
 class EnsurePasswordIsChanged
 {
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->user()?->must_change_password) {
-            return redirect()->route('settings.edit')->with('must_change_password', true);
+            return redirect()->route('password.choose');
         }
 
         return $next($request);

@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             TranslationSeeder::class,   // after the languages: one row per text and language
             PageSeeder::class,
+            MenuSeeder::class,          // after the pages: the links point at them
         ]);
     }
 }

@@ -11,15 +11,5 @@
      aria-orientation="vertical"
      aria-labelledby="user-menu-button"
      tabindex="-1">
-    <x-dropdown-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
-        {{ __('dashboard') }}
-    </x-dropdown-nav-link>
-    <x-dropdown-nav-link :href="route('shopping_list.index')" :active="request()->routeIs(['shopping_list*', 'item*'])" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
-        {{ __('shopping_list') }}
-    </x-dropdown-nav-link>
-    @can('manage-family')
-        <x-dropdown-nav-link :href="route('family.members.index')" :active="request()->routeIs('family*')" wire:navigate class="text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500">
-            {{ __('family') }}
-        </x-dropdown-nav-link>
-    @endcan
+    @include('partials.navbar-items', ['mobile' => true])
 </div>

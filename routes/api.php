@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\SyncController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::get('health', fn () => response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]));
 
     Route::post('auth/login', [AuthController::class, 'login']);
+    Route::get('menus', [MenuController::class, 'index']);
 
     // Reachable with either token (needed to finish a first login)
     Route::middleware(['auth:sanctum', 'ability:sync,change-password'])->group(function () {

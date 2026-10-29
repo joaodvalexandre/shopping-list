@@ -58,6 +58,10 @@ When creating or editing a list, an admin (or anyone who manages that type) can 
 
 If a list is hidden from every person who could manage it, nobody can edit it until one of them is un-hidden from the database. Keep at least one manager who can see it.
 
+### The demo family
+
+To try the web and phone apps with something in them: `php artisan db:seed --class=DemoSeeder` (never in production). It creates the family *Silva* with **joana@demo.test** (admin), **bia@demo.test** (adds items and uses the cart in Groceries, only looks at Pharmacy, cannot see *Bia's birthday*) and **rui@demo.test** (edits items and manages lists in Groceries). Everyone's first-time password is `Silva`.
+
 ### Where the rules live
 
 All access goes through one place, so the web app and the API always agree:
@@ -86,7 +90,8 @@ What you can do there:
 | **Dashboard** | Totals with a 14-day trend (families, members and how many still wait for their first login, lists, items), new families and members per month, system information, latest families |
 | **Families** | Create a family together with its first admin (the first-time password, the family name, is shown after saving). Rename, delete (removes the family with everything in it). Each family's page lists its members |
 | **Members** | Every member of every family: search, filter by family/role/status. Edit name, email and role (promote to admin), **reset password** (new temporary password, signed out everywhere), **sign out everywhere**, delete. A family can never be left without an admin |
-| **Pages** | Simple content pages (privacy, about, help...) with a title and rich text **per language**, shown at `/p/<address>`. Drafts are hidden; published pages can be linked in the site footer |
+| **Pages** | Simple content pages (privacy, about, help...) with a title and rich text **per language**, shown at `/p/<address>`. Drafts are hidden |
+| **Menus** | Every link of the site's **navbar**, **account menu** and **footer** (see [Menus](#menus)) |
 | **Languages** | Switch languages on/off, choose the default, add new ones (Spanish, French...). Whatever is switched on appears in the language menu and in members' settings. The default and English (the fallback) cannot be deleted |
 | **Texts** | Every text of the app, per language. The shipped text is shown next to a box where you type your own version; blank goes back to the default. Placeholders such as `:seconds` must be kept. Use **Sync texts** after adding a language or new texts to the code |
 | **Administrators** | Add and remove people who can sign in to the backoffice, give them roles; reset someone's two-factor setup if they lose their authenticator |
@@ -114,6 +119,26 @@ Rules worth knowing:
 - Screens and buttons an administrator may not use are hidden, and opening them anyway answers 403.
 - The family app's own roles (family admin, member) and per-list-type permissions are a separate thing, described [above](#how-it-works).
 
+### Menus
+
+The navbar, the account menu (under the person's name) and the footer are **not hard-coded**: they are drawn from the links you arrange in **Menus**. Each link:
+
+| | |
+|---|---|
+| **Where** | Navbar, account menu or footer |
+| **Points at** | A **content page**; one of the **app's own screens** (dashboard, shopping lists, family members, list types, settings, log in); an **address** (`https://...` or a path of this site); or a **heading** that only holds other links |
+| **Shown to** | Everyone, visitors who are not signed in, anyone signed in, or family admins only. A screen only offers the audiences it is meant for (the dashboard is never offered to visitors) |
+| **Text** | Per language. Optional for a page or a screen, which bring their own name |
+| **Under** | Another link of the same place: in the navbar it becomes a dropdown, in the footer a column. Two levels at most |
+| **Order, active, new tab** | Drag to reorder; switch a link off without deleting it; open in a new tab |
+
+Things to know:
+
+- Hiding a link does **not** protect a page; it only decides who is offered it. Every screen still checks permissions itself.
+- Only `http(s)` addresses and paths of this site are linked, never `javascript:` and the like. A link to a draft page, or a heading with nothing under it, is not drawn.
+- The app never leaves a signed-in person without a way around: if no navbar link is meant for them, the dashboard and shopping lists are shown anyway.
+- The phone app shows the same page and address links (`GET /api/v1/menus`); the app's own web screens are left out, as it has its own.
+
 ### Seeders
 
 `php artisan db:seed` (also part of `migrate --seed`) is safe to run again at any time:
@@ -124,6 +149,7 @@ Rules worth knowing:
 | `LanguageSeeder` | Portuguese (default) and English |
 | `PermissionSeeder`, `RoleSeeder` | Every permission and the shipped roles. Existing roles keep what was ticked, except the super administrator, which always gets every permission |
 | `TranslationSeeder` | One editable row per text and language |
+| `MenuSeeder` | Starter links (see [Menus](#menus)), only when there are no links at all |
 | `PageSeeder` | Starter pages (About, Privacy policy, Terms of use) in both languages. **They are a starting point: read them, adjust them and add your contact details in the backoffice before going public.** A page that exists is never overwritten |
 
 **Two-factor sign-in** (authenticator app, with recovery codes) is **required in production** and optional while developing. Each administrator sets it up from their profile.

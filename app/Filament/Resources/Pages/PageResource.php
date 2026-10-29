@@ -84,9 +84,6 @@ class PageResource extends Resource
                     ->columnSpanFull(),
                 Toggle::make('is_published')
                     ->label(fn () => __('bo_published')),
-                Toggle::make('show_in_footer')
-                    ->label(fn () => __('bo_in_footer'))
-                    ->default(true),
             ])->columns(2),
 
             Tabs::make('languages')->tabs($tabs)->columnSpanFull(),
@@ -106,7 +103,6 @@ class PageResource extends Resource
                     ->label(fn () => __('bo_title'))
                     ->state(fn (Page $record) => $record->titleIn(Language::defaultCode())),
                 ToggleColumn::make('is_published')->label(fn () => __('bo_published')),
-                ToggleColumn::make('show_in_footer')->label(fn () => __('bo_in_footer')),
                 TextColumn::make('updated_at')->label(fn () => __('bo_updated'))->since()->sortable(),
             ])
             ->defaultSort('sort')

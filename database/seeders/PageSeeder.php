@@ -42,7 +42,6 @@ class PageSeeder extends Seeder
                         . '<li>It works in the browser and in the Android app.</li></ul>',
                 ],
                 'is_published' => true,
-                'show_in_footer' => true,
             ],
             [
                 'slug' => 'privacy',
@@ -76,7 +75,6 @@ class PageSeeder extends Seeder
                         . '<p>Ask your family\'s administrator to remove your account. The account data and the sessions on your phones are deleted.</p>',
                 ],
                 'is_published' => true,
-                'show_in_footer' => true,
             ],
             [
                 'slug' => 'terms',
@@ -100,7 +98,6 @@ class PageSeeder extends Seeder
                         . '<p>We do our best to keep the service available, but we cannot promise there will be no interruptions.</p>',
                 ],
                 'is_published' => true,
-                'show_in_footer' => true,
             ],
         ];
     }

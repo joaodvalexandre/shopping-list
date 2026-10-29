@@ -59,14 +59,7 @@ new class extends Component
                         <div x-show="open" x-cloak @click.away="open = false"
                              class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-md bg-white dark:bg-gray-700 py-1 shadow-lg ring-1 ring-black ring-opacity-5"
                              role="menu">
-                            <x-dropdown-nav-link :href="route('settings.edit')" wire:navigate class="text-gray-700 dark:text-gray-300">
-                                {{ __('settings') }}
-                            </x-dropdown-nav-link>
-                            @can('manage-family')
-                                <x-dropdown-nav-link :href="route('family.members.index')" wire:navigate class="text-gray-700 dark:text-gray-300">
-                                    {{ __('family') }}
-                                </x-dropdown-nav-link>
-                            @endcan
+                            @include('partials.user-menu-items')
                             <button wire:click="logout" type="button"
                                     class="mx-2 my-1 block w-[calc(100%-1rem)] px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600">
                                 {{ __('logout') }}

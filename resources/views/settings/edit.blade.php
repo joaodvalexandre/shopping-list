@@ -1,10 +1,4 @@
 <x-app-layout>
-    @if(session('must_change_password') || $user->must_change_password)
-        <div class="p-4 rounded-lg bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100">
-            {{ __('must_change_password') }}
-        </div>
-    @endif
-
     <div class="grid gap-8 lg:grid-cols-2">
         <!-- Profile -->
         <form method="POST" action="{{ route('settings.profile') }}" class="flex flex-col gap-3">

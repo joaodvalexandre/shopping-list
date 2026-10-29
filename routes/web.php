@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\ChoosePasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Family\ListTypeController;
@@ -41,12 +42,15 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
 
-    // Reachable while a temporary password is still set
-    Route::get('settings', [SettingsController::class, 'edit'])->name('settings.edit');
-    Route::put('settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
-    Route::put('settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
+    // The one page reachable while a temporary password is still set
+    Route::get('password/choose', [ChoosePasswordController::class, 'create'])->name('password.choose');
+    Route::put('password/choose', [ChoosePasswordController::class, 'store'])->name('password.choose.store');
 
     Route::middleware('password.changed')->group(function () {
+        Route::get('settings', [SettingsController::class, 'edit'])->name('settings.edit');
+        Route::put('settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
+        Route::put('settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
+
         // Redirect root to dashboard
         Route::redirect('/', '/dashboard');
 

@@ -7,6 +7,7 @@ use App\Models\Admin;
 use App\Models\Family;
 use App\Models\Item;
 use App\Models\Language;
+use App\Models\MenuItem;
 use App\Models\Page;
 use App\Models\Permission;
 use App\Models\Role;
@@ -19,6 +20,7 @@ use App\Policies\Backoffice\AdminPolicy;
 use App\Policies\Backoffice\FamilyPolicy;
 use App\Policies\Backoffice\LanguagePolicy;
 use App\Policies\Backoffice\MemberPolicy;
+use App\Policies\Backoffice\MenuItemPolicy;
 use App\Policies\Backoffice\PagePolicy;
 use App\Policies\Backoffice\PermissionPolicy;
 use App\Policies\Backoffice\RolePolicy;
@@ -81,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
             Family::class => FamilyPolicy::class,
             User::class => MemberPolicy::class,
             Page::class => PagePolicy::class,
+            MenuItem::class => MenuItemPolicy::class,
             Language::class => LanguagePolicy::class,
             Translation::class => TranslationPolicy::class,
             Admin::class => AdminPolicy::class,

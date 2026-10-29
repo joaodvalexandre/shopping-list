@@ -18,8 +18,11 @@ class StatusSeeder extends Seeder
             ['code' => 'purchased',   'color' => '#4CAF50'], // Green
         ];
 
+        // Safe to run again: only the missing ones are added (ids 1, 2, 3 are hard-coded elsewhere)
         foreach ($statuses as $status) {
-            DB::table('status')->insert($status);
+            if (! DB::table('status')->where('code', $status['code'])->exists()) {
+                DB::table('status')->insert($status);
+            }
         }
     }
 }

@@ -18,7 +18,12 @@
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 px-6 py-6">
-            <div class="flex items-center gap-2 mb-6">
+            {{-- Links of the navbar (backoffice: Menus), then the language and theme choice --}}
+            <div class="flex flex-wrap items-center justify-center gap-2 mb-6">
+                {{-- (not while choosing a first password: every link would only lead back there) --}}
+                @unless($attributes->has('no-menu'))
+                    @include('partials.navbar-items')
+                @endunless
                 @include('partials.language-dropdown')
                 @include('partials.theme-toggle')
             </div>

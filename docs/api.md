@@ -203,6 +203,23 @@ Every synced field has its own change time, so two phones editing *different* fi
 - Tombstones for lists in `known_lists` and for items of visible lists.
 - `hidden_from` on a list is included only for users who may manage it.
 
+## Menus
+
+### `GET /menus?locale=pt`
+
+Public (no token needed). The navbar, account menu and footer links arranged in the backoffice, in the given language (an unknown or missing one falls back to the default). With a token, links meant only for signed-in people or family admins are included for those who may see them.
+
+```json
+{
+  "locale": "pt",
+  "navbar": [ { "label": "Sobre", "url": "https://example.com/p/about?lang=pt", "new_tab": false, "children": [] } ],
+  "user_menu": [],
+  "footer": [ { "label": "Legal", "url": null, "new_tab": false, "children": [ { "label": "Política de privacidade", "url": "https://example.com/p/privacy?lang=pt", "new_tab": false, "children": [] } ] } ]
+}
+```
+
+A `url` of `null` is a heading that only holds its `children`. Open the URLs in the browser. The web app's own screens (dashboard, lists...) are left out: the app has its own.
+
 ## Health
 
 ### `GET /health`

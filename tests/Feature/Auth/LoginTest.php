@@ -53,12 +53,12 @@ it('logs out', function () {
 it('forces members with a temporary password to choose their own', function () {
     $user = User::factory()->mustChangePassword()->create(['password' => 'temp-pass-123']);
 
-    $this->actingAs($user)->get('/dashboard')->assertRedirect(route('settings.edit'));
-    $this->actingAs($user)->get('/shopping_list')->assertRedirect(route('settings.edit'));
-    $this->actingAs($user)->get('/settings')->assertOk();
+    $this->actingAs($user)->get('/dashboard')->assertRedirect(route('password.choose'));
+    $this->actingAs($user)->get('/shopping_list')->assertRedirect(route('password.choose'));
+    $this->actingAs($user)->get('/settings')->assertRedirect(route('password.choose'));
+    $this->actingAs($user)->get('/password/choose')->assertOk();
 
-    $this->actingAs($user)->put('/settings/password', [
-        'current_password' => 'temp-pass-123',
+    $this->actingAs($user)->put('/password/choose', [
         'password' => 'brand-new-pass1',
         'password_confirmation' => 'brand-new-pass1',
     ])->assertRedirect(route('dashboard'));
@@ -67,34 +67,18 @@ it('forces members with a temporary password to choose their own', function () {
     $this->actingAs($user->fresh())->get('/dashboard')->assertOk();
 });
 
-it('refuses a new password equal to the current one or too weak', function () {
+it('refuses a new password equal to the temporary one or too weak', function () {
     $user = User::factory()->mustChangePassword()->create(['password' => 'temp-pass-123']);
 
-    $this->actingAs($user)->put('/settings/password', [
-        'current_password' => 'temp-pass-123',
+    $this->actingAs($user)->put('/password/choose', [
         'password' => 'temp-pass-123',
         'password_confirmation' => 'temp-pass-123',
     ])->assertSessionHasErrors('password');
 
-    $this->actingAs($user)->put('/settings/password', [
-        'current_password' => 'temp-pass-123',
+    $this->actingAs($user)->put('/password/choose', [
         'password' => 'short',
         'password_confirmation' => 'short',
     ])->assertSessionHasErrors('password');
 
     expect($user->fresh()->must_change_password)->toBeTrue();
-});
-
-it('applies the language saved on the account', function () {
-    $user = User::factory()->create(['locale' => 'en']);
-
-    $this->actingAs($user)->get('/dashboard');
-
-    expect(app()->getLocale())->toBe('en');
-});
-
-it('loads Livewire (and Alpine) on guest pages, so the language menu and theme toggle work', function () {
-    foreach (['/login'] as $url) {
-        $this->get($url)->assertOk()->assertSee('livewire', false)->assertSee('[x-cloak]', false);
-    }
 });

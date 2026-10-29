@@ -34,15 +34,18 @@ it('forces the family admin to choose their own password before anything else', 
 
     $this->post('/login', ['email' => 'joana@example.com', 'password' => 'Silva'])->assertRedirect(route('dashboard'));
 
-    // every page sends them to the settings page until they change it
-    $this->get('/dashboard')->assertRedirect(route('settings.edit'));
-    $this->get('/shopping_list')->assertRedirect(route('settings.edit'));
+    // every page sends them to the "choose your password" page until they do
+    $this->get('/dashboard')->assertRedirect(route('password.choose'));
+    $this->get('/shopping_list')->assertRedirect(route('password.choose'));
+    $this->get('/settings')->assertRedirect(route('password.choose'));
+    $this->get('/password/choose')->assertOk()->assertDontSee('current_password');
 
     // the family name is not accepted as the new password
-    $this->put('/settings/password', ['current_password' => 'Silva', 'password' => 'Silva', 'password_confirmation' => 'Silva'])
+    $this->put('/password/choose', ['password' => 'Silva', 'password_confirmation' => 'Silva'])
         ->assertSessionHasErrors('password');
 
-    $this->put('/settings/password', ['current_password' => 'Silva', 'password' => 'Brand-new-1', 'password_confirmation' => 'Brand-new-1'])
+    // no old password needed: they just proved it by signing in
+    $this->put('/password/choose', ['password' => 'Brand-new-1', 'password_confirmation' => 'Brand-new-1'])
         ->assertRedirect(route('dashboard'));
 
     $this->get('/dashboard')->assertOk();
@@ -97,4 +100,28 @@ it('uses the name of the right family, not another one', function () {
 
     $this->post('/login', ['email' => 'rui@example.com', 'password' => 'Silva'])->assertSessionHasErrors();
     $this->post('/login', ['email' => 'rui@example.com', 'password' => 'Costa'])->assertRedirect(route('dashboard'));
+});
+
+it('keeps the choose-password page for people on a temporary password only', function () {
+    $f = makeFamily();   // the admin has a chosen password
+
+    $this->actingAs($f['admin'])->get('/password/choose')->assertRedirect(route('dashboard'));
+    $this->actingAs($f['admin'])->put('/password/choose', ['password' => 'Brand-new-1', 'password_confirmation' => 'Brand-new-1'])
+        ->assertForbidden();
+});
+
+it('keeps guests out of the choose-password page', function () {
+    $this->get('/password/choose')->assertRedirect(route('login'));
+    $this->put('/password/choose', [])->assertRedirect(route('login'));
+});
+
+it('checks the new password on the choose-password page', function () {
+    app(FamilyProvisioner::class)->create('Silva', 'Joana', 'joana@example.com');
+    $this->post('/login', ['email' => 'joana@example.com', 'password' => 'Silva']);
+
+    $this->put('/password/choose', ['password' => 'short1', 'password_confirmation' => 'short1'])->assertSessionHasErrors('password');
+    $this->put('/password/choose', ['password' => 'Brand-new-1', 'password_confirmation' => 'different-1'])->assertSessionHasErrors('password');
+    $this->put('/password/choose', ['password' => 'onlyletters', 'password_confirmation' => 'onlyletters'])->assertSessionHasErrors('password');
+
+    expect(User::where('email', 'joana@example.com')->first()->must_change_password)->toBeTrue();
 });

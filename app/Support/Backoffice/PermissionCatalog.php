@@ -17,6 +17,7 @@ class PermissionCatalog
             'families' => $crud,
             'members' => $crud,        // "update" also covers reset password / sign out everywhere
             'pages' => $crud,
+            'menus' => $crud,        // the links of the navbar and footer
             'languages' => $crud,
             'texts' => ['view', 'update'],
             'administrators' => $crud,
@@ -47,7 +48,7 @@ class PermissionCatalog
         return [
             'super-admin' => static::names(),
             'support' => ['families.view', 'families.create', 'members.view', 'members.create', 'members.update'],
-            'content-editor' => ['pages.view', 'pages.create', 'pages.update', 'pages.delete', 'texts.view', 'texts.update'],
+            'content-editor' => ['pages.view', 'pages.create', 'pages.update', 'pages.delete', 'menus.view', 'menus.create', 'menus.update', 'menus.delete', 'texts.view', 'texts.update'],
             'translator' => ['languages.view', 'texts.view', 'texts.update'],
             'viewer' => $viewOnly,
         ];

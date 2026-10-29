@@ -40,7 +40,6 @@ return new class extends Migration
             $table->json('title');                      // {"en": "...", "pt": "..."}
             $table->json('content');
             $table->boolean('is_published')->default(false);
-            $table->boolean('show_in_footer')->default(true);
             $table->unsignedSmallInteger('sort')->default(0);
             $table->timestamps();
         });
