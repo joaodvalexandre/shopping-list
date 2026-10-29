@@ -8,6 +8,7 @@ import '../../peer/nearby_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/family_link.dart';
 import '../theme.dart';
+import '../who.dart';
 import '../widgets/common.dart';
 import '../widgets/family_cards.dart';
 import '../widgets/family_dialogs.dart';
@@ -66,7 +67,7 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
         // That this phone is in the family, as whom, and how the link with the others is
         FamilyHeader(
           familyName: me?.familyName ?? '',
-          you: context.t('app_family_you_as', {'name': me?.name ?? ''}),
+          you: context.t('app_family_you_as', {'name': context.who(me?.name ?? '')}),
           statusText: linkText,
           statusIcon: linkIcon,
           statusColor: linkColor,
@@ -91,12 +92,12 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Panel(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(context.t('app_family_background_help'), style: TextStyle(fontSize: 13, color: muted)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
                     Align(
                       alignment: Alignment.centerRight,
                       child: PillButton(
@@ -183,7 +184,7 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
     void open() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LocalMemberScreen(memberId: member.id)));
 
     return FamilyMemberCard(
-      name: member.name,
+      name: context.who(member.name),
       own: own,
       onTap: open,
       // (an offline family has no emails: the line says whose phone it is)
@@ -214,7 +215,7 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
             tooltip: context.t('delete'),
             icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
             onPressed: () async {
-              if (await confirm(context, context.rt('app_family_remove_confirm', {'name': member.name}), action: context.rt('app_family_remove_member'))) {
+              if (await confirm(context, context.rt('app_family_remove_confirm', {'name': context.who(member.name)}), action: context.rt('app_family_remove_member'))) {
                 repository.removeLocalMember(member.id);
               }
             },

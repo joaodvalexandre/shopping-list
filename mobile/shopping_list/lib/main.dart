@@ -49,7 +49,7 @@ Future<void> main() async {
   final sink = await LocalNoticeSink.create(onTap: (uuid) => openListFromNotification(uuid, repository, auth));
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool(closedByUserKey, false);
-  final notifications = NotificationService(store: db, prefs: prefs, content: content, sink: sink);
+  final notifications = NotificationService(store: db, prefs: prefs, content: content, sink: sink, displayName: repository.displayName);
 
   // Phones of the family nearby: who this phone is, and the signed credential that proves it
   final identity = PeerIdentity(secrets: const SecureSecretStore(), store: db);
@@ -95,7 +95,7 @@ Future<void> main() async {
       notifications.deliver(result.applied.events, onScreen: onScreen);
     },
   );
-  final link = FamilyLink(auth: auth, nearby: nearby, settings: settings);
+  final link = FamilyLink(auth: auth, nearby: nearby, settings: settings, displayName: repository.displayName);
 
   // Banners inside the app, for what others do on lists the person is not looking at
   notifications.onInApp = (notices) => InAppBanner.show(

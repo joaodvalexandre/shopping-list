@@ -9,6 +9,7 @@ import 'activity.dart';
 import 'local_db.dart';
 import 'me.dart';
 import 'models.dart';
+import 'names.dart';
 import '../peer/local_family.dart';
 import 'peer_info.dart';
 
@@ -127,6 +128,9 @@ class Repository extends ChangeNotifier {
 
   /// This phone's person, for putting a name to what they change.
   String get _myName => _me?.name ?? '';
+
+  /// A person's name as the app shows it: their own, then the family's ("João Alexandre").
+  String displayName(String name) => withFamilyName(name, _me?.familyName ?? '');
 
   /// A local family (no server, ever): its changes are never "waiting for the server", and what
   /// the phones of the family hold is compared and completed between them (see [buildLocalDigest]).

@@ -9,6 +9,7 @@ import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
 import '../screens/settings_screen.dart';
 import '../theme.dart';
+import '../who.dart';
 import 'common.dart';
 
 /// The app's logo: the basket, as on the launcher icon and the web.
@@ -95,7 +96,7 @@ class UserMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repository = context.watch<Repository>();
-    final name = repository.me?.name ?? '';
+    final name = repository.displayName(repository.me?.name ?? '');
 
     return PopupMenuButton<String>(
       tooltip: name,
@@ -252,7 +253,7 @@ class SyncBanner extends StatelessWidget {
     return (context.t('app_nearby_other_version', {'version': nearby.otherVersionSeen!}), Icons.system_update_outlined, Tw.amber600);
   }
 
-  final who = nearby.currentPeer ?? '';
+  final who = context.who(nearby.currentPeer ?? '');
 
   return switch (nearby.state) {
     NearbyState.connected => (context.t('app_local_connected', {'name': who}), Icons.bluetooth_connected, Tw.green600),
@@ -275,7 +276,7 @@ class SyncBanner extends StatelessWidget {
     return (context.t('app_nearby_other_version', {'version': nearby.otherVersionSeen!}), Icons.system_update_outlined, Tw.amber600);
   }
 
-  final who = nearby.currentPeer ?? '';
+  final who = context.who(nearby.currentPeer ?? '');
   final last = nearby.lastResult;
   final recent = nearby.lastMeetingAt != null && DateTime.now().difference(nearby.lastMeetingAt!) < const Duration(seconds: 25);
 
@@ -288,7 +289,7 @@ class SyncBanner extends StatelessWidget {
         Tw.green600,
       ),
     _ when recent && last != null && last.ok => (
-        context.t('app_nearby_done', {'name': last.peerName ?? '', 'sent': last.sent, 'received': last.applied.total}),
+        context.t('app_nearby_done', {'name': context.who(last.peerName ?? ''), 'sent': last.sent, 'received': last.applied.total}),
         Icons.bluetooth_connected,
         Tw.green600,
       ),
@@ -310,7 +311,7 @@ class PageHeader extends StatelessWidget {
       elevation: 1,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Text(title, style: const TextStyle(fontSize: 16)),
       ),
     );

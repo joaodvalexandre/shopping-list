@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -7,6 +8,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../data/api_client.dart';
 import '../data/local_db.dart';
+import '../data/names.dart';
 import 'auth_state.dart';
 import 'content_service.dart';
 import 'notification_service.dart';
@@ -74,12 +76,21 @@ Future<int> runBackgroundCheck() async {
   final language = prefs.getString(SettingsState.effectiveLanguageKey);
   final api = ApiClient(baseUrl: prefs.getString('server') ?? defaultServerUrl, token: token)..language = language;
 
+  var familyName = '';
+  try {
+    final me = await db.getMeta('me');
+    familyName = (jsonDecode(me ?? '{}')['family']?['name'] as String?) ?? '';
+  } catch (_) {
+    // (no name to add)
+  }
+
   try {
     final service = NotificationService(
       store: db,
       prefs: prefs,
       content: await ContentService.load(db),
       sink: await LocalNoticeSink.create(),
+      displayName: (name) => withFamilyName(name, familyName),
     );
 
     return await service.check(api, foreground: false);

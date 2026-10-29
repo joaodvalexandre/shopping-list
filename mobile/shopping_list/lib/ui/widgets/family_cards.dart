@@ -35,17 +35,17 @@ class FamilyMemberCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(own ? '$name  (${context.t('app_you')})' : name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
               if (subtitle != null) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(subtitle!, style: TextStyle(fontSize: 13, color: muted), overflow: TextOverflow.ellipsis),
               ],
-              const SizedBox(height: 8),
-              Wrap(spacing: 6, runSpacing: 4, children: pills),
+              const SizedBox(height: 10),
+              Wrap(spacing: 6, runSpacing: 6, children: pills),
               Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),
             ],
           ),
@@ -73,7 +73,7 @@ class FamilyTypeCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
         child: Row(
           children: [
             Expanded(
@@ -81,6 +81,7 @@ class FamilyTypeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 4),
                   Text('${context.t('lists')}: $listsCount', style: TextStyle(fontSize: 13, color: muted)),
                 ],
               ),
@@ -124,7 +125,7 @@ class FamilyHeader extends StatelessWidget {
     final muted = dark ? Tw.gray400 : Tw.gray500;
 
     return Panel(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(18, 16, 10, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -147,8 +148,9 @@ class FamilyHeader extends StatelessWidget {
                 onPressed: onRename,
               ),
           ]),
+          const SizedBox(height: 2),
           Text(you, style: TextStyle(fontSize: 13, color: muted)),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Row(children: [
             Icon(statusIcon, size: 16, color: statusColor),
             const SizedBox(width: 6),

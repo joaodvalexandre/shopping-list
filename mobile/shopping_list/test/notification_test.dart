@@ -50,7 +50,7 @@ void main() {
   late SharedPreferences prefs;
   late NotificationService service;
 
-  Future<void> setUpService({Map<String, Object> values = const {}}) async {
+  Future<void> setUpService({Map<String, Object> values = const {}, String Function(String name)? displayName}) async {
     SharedPreferences.setMockInitialValues({SettingsState.effectiveLanguageKey: 'en', ...values});
     prefs = await SharedPreferences.getInstance();
     store = MemoryStore();
@@ -68,7 +68,7 @@ void main() {
       }),
     );
 
-    service = NotificationService(store: store, prefs: prefs, content: content, sink: sink);
+    service = NotificationService(store: store, prefs: prefs, content: content, sink: sink, displayName: displayName);
   }
 
   setUp(() => setUpService());
@@ -300,5 +300,15 @@ void main() {
       await service.deliver([made('item_added')], onScreen: true);
       expect(sink.played, ['cart']);
     });
+  });
+
+  test('who did it is told with the family name after their own', () async {
+    await setUpService(displayName: (name) => '$name Silva');
+
+    await service.deliver([
+      ActivityEvent(id: 1, kind: 'item_added', actor: 'Bia', listUuid: 'l', list: 'Barbecue', item: 'Milk', quantity: 1),
+    ], onScreen: false);
+
+    expect(sink.shown.single.lines, ['Bia Silva added Milk']);
   });
 }

@@ -22,6 +22,9 @@ class ActivityEvent {
   final String? item;
   final int? quantity;
 
+  /// The same thing, said of [actor] (the name as shown).
+  ActivityEvent by(String? actor) => ActivityEvent(id: id, kind: kind, actor: actor, listUuid: listUuid, list: list, item: item, quantity: quantity);
+
   static ActivityEvent fromJson(Map<String, dynamic> json) => ActivityEvent(
         id: (json['id'] as num).toInt(),
         kind: json['kind'] as String,

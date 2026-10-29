@@ -38,7 +38,10 @@ abstract class NoticeSink {
 /// and, in the background, every 15 minutes (Android's own minimum for scheduled work).
 /// What this person did themself is never reported, nor what they may not see.
 class NotificationService {
-  NotificationService({required this.store, required this.prefs, required this.content, required this.sink});
+  NotificationService({required this.store, required this.prefs, required this.content, required this.sink, this.displayName});
+
+  /// Puts the family's name after a person's ("Ana Silva"); the names as they come when null.
+  final String Function(String name)? displayName;
 
   final LocalStore store;
   final SharedPreferences prefs;
@@ -133,7 +136,10 @@ class NotificationService {
   /// it off screen (or closed), a phone notification, one per list, with a line for each thing
   /// that was done. Only the kinds of thing this person wants to hear about. Returns how many.
   Future<int> deliver(List<ActivityEvent> all, {required bool onScreen}) async {
-    final events = all.where((event) => wantsKind(event.kind)).toList();
+    final events = [
+      for (final event in all)
+        if (wantsKind(event.kind)) displayName == null || event.actor == null ? event : event.by(displayName!(event.actor!)),
+    ];
     if (events.isEmpty) return 0;
 
     final notices = buildNotices(events, _text);

@@ -6,6 +6,7 @@ import '../../data/family.dart';
 import '../../data/repository.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
+import '../who.dart';
 import '../widgets/common.dart';
 import '../widgets/family_cards.dart';
 import '../widgets/family_dialogs.dart';
@@ -180,7 +181,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
 
     return FamilyHeader(
       familyName: me?.familyName ?? '',
-      you: context.t('app_family_you_as', {'name': me?.name ?? ''}),
+      you: context.t('app_family_you_as', {'name': context.who(me?.name ?? '')}),
       statusText: text,
       statusIcon: icon,
       statusColor: color,
@@ -195,7 +196,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
     final own = member.id == context.read<Repository>().me?.userId;
 
     return FamilyMemberCard(
-      name: member.name,
+      name: context.who(member.name),
       own: own,
       subtitle: member.email,
       pills: [

@@ -13,6 +13,7 @@ import '../../state/notification_service.dart';
 import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
+import '../who.dart';
 import '../widgets/common.dart';
 import '../widgets/menu_footer.dart';
 import '../widgets/password_form.dart';
@@ -156,11 +157,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final me = repository.me;
     final dark = context.isDark;
     final muted = dark ? Tw.gray400 : Tw.gray500;
-    final name = me?.name ?? '';
+    final name = repository.displayName(me?.name ?? '');
     final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((word) => word.characters.first.toUpperCase()).join();
 
     return Panel(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       child: Row(
         children: [
           CircleAvatar(
@@ -175,8 +176,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               children: [
                 Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                 if (!local && (me?.email ?? '').isNotEmpty) Text(me!.email, style: TextStyle(fontSize: 13, color: muted)),
-                const SizedBox(height: 6),
-                Wrap(spacing: 6, runSpacing: 4, children: [
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
                   StatusPill(text: context.t(me?.isAdmin == true ? 'role_admin' : 'role_member'), color: me?.isAdmin == true ? Tw.purple500 : Tw.blue500),
                   StatusPill(
                     text: (me?.familyName ?? '').isEmpty ? context.t('app_offline_family_unknown') : me!.familyName,
@@ -232,8 +233,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         },
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
-        child: Text(context.t('app_notify_when'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: muted)),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(context.t('app_notify_when'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: muted)),
+        ),
       ),
       kind(Icons.add_shopping_cart, 'app_notify_added', 'notify_added'),
       kind(Icons.shopping_cart_outlined, 'app_notify_cart', 'notify_cart'),
@@ -287,7 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final last = nearby.lastResult;
 
     final lastText = last != null && last.ok
-        ? context.t('app_nearby_last', {'text': context.t('app_nearby_done', {'name': last.peerName ?? '', 'sent': last.sent, 'received': last.applied.total})})
+        ? context.t('app_nearby_last', {'text': context.t('app_nearby_done', {'name': context.who(last.peerName ?? ''), 'sent': last.sent, 'received': last.applied.total})})
         : null;
 
     return _Group(title: context.t('app_settings_connection'), children: [
@@ -336,8 +340,14 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
   // ---------------------------------------------------------------- rows
 
+  // Room between a row's text and the lines above and below it
+  static const _rowPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 4);
+  static const _rowGap = 14.0;
+
   Widget _row({required IconData icon, required String title, Widget? subtitle, Widget? trailing, VoidCallback? onTap, Color? iconColor}) {
     return ListTile(
+      contentPadding: _rowPadding,
+      minVerticalPadding: _rowGap,
       leading: Icon(icon, color: iconColor),
       title: Text(title),
       subtitle: subtitle,
@@ -348,6 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
   Widget _switchRow({required IconData icon, required String title, String? subtitle, required bool value, required ValueChanged<bool> onChanged}) {
     return SwitchListTile(
+      contentPadding: _rowPadding,
       secondary: Icon(icon),
       title: Text(title),
       subtitle: subtitle == null ? null : Text(subtitle, style: TextStyle(fontSize: 12, color: context.isDark ? Tw.gray400 : Tw.gray500)),
@@ -375,7 +386,7 @@ class _Group extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: Text(title.toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: muted)),
           ),
           Card(

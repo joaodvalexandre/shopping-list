@@ -10,7 +10,7 @@ import 'settings_state.dart';
 /// running with a notification that stays, and this is the one that says how the family link is.
 /// Only for a local family (a server family asks the server, and has notifications for that).
 class FamilyLink {
-  FamilyLink({required this.auth, required this.nearby, required this.settings, MethodChannel? channel})
+  FamilyLink({required this.auth, required this.nearby, required this.settings, this.displayName, MethodChannel? channel})
       : _channel = channel ?? const MethodChannel('app.cestou.mobile/family_link') {
     auth.addListener(update);
     nearby.addListener(update);
@@ -21,6 +21,7 @@ class FamilyLink {
   final NearbyService nearby;
   final SettingsState settings;
   final MethodChannel _channel;
+  final String Function(String name)? displayName;
 
   bool _running = false;
   String? _text;
@@ -36,7 +37,7 @@ class FamilyLink {
   String get statusText {
     if (!auth.isLocal) return settings.t('app_link_watching');
 
-    final who = nearby.currentPeer ?? '';
+    final who = displayName?.call(nearby.currentPeer ?? '') ?? nearby.currentPeer ?? '';
 
     return switch (nearby.state) {
       NearbyState.connected => settings.t('app_link_connected', {'name': who}),

@@ -6,6 +6,7 @@ import '../../data/models.dart';
 import '../../data/repository.dart';
 import '../../peer/nearby_service.dart';
 import '../theme.dart';
+import '../who.dart';
 import '../widgets/common.dart';
 
 /// One person of an offline family, laid out like the member form of a server family: who they are,
@@ -95,7 +96,7 @@ class _LocalMemberScreenState extends State<LocalMemberScreen> {
                 // Names belong to the people: each changes their own, on their own phone
                 Text(context.t('name'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
                 const SizedBox(height: 4),
-                Text(member.name, style: const TextStyle(fontSize: 16)),
+                Text(context.who(member.name), style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 2),
                 Text(
                   own

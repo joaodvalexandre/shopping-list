@@ -97,7 +97,7 @@ class ListDetailScreen extends StatelessWidget {
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 40),
                       itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) => _ItemRow(
                         item: items[index],
                         canEdit: canEdit,
@@ -129,7 +129,7 @@ class _ItemRow extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
         child: Row(
           children: [
             Expanded(
@@ -154,7 +154,7 @@ class _ItemRow extends StatelessWidget {
                       Icon(Icons.cloud_upload_outlined, size: 14, color: dark ? Tw.gray400 : Tw.gray500),
                     ],
                   ]),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Row(children: [
                     Text('${context.t('quant')} ${item.quantity}', style: TextStyle(fontSize: 12, color: dark ? Tw.gray400 : Tw.gray500)),
                     const SizedBox(width: 10),

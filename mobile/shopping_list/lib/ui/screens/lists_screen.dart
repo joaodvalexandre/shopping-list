@@ -72,7 +72,7 @@ class _ListRow extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: list.uuid))),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 14),
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -106,9 +106,9 @@ class _ListRow extends StatelessWidget {
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Align(alignment: Alignment.centerLeft, child: StatusPill(text: context.t(state.textKey), color: Tw.named(state.color))),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               // Four equal columns, so labels have room however narrow the phone is
               Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -133,7 +133,7 @@ class _ListRow extends StatelessWidget {
       child: Column(
         children: [
           Text('$value', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             context.t(key),
             maxLines: 1,
