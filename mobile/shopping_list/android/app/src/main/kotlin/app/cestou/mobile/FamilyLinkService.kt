@@ -11,9 +11,9 @@ import android.os.Build
 import android.os.IBinder
 
 /**
- * Keeps the app alive while the phone is locked or the app is off screen, so the family's phones
- * stay connected and changes arrive at once. Android only allows that with a notification that
- * stays visible: this is it. It does nothing else; the connection itself is the app's.
+ * Keeps the app alive while the phone is locked, the app is off screen, or it was closed, so the
+ * family's phones stay connected and changes arrive at once. Android only allows that with a
+ * notification that stays visible: this is it. It does nothing else; the connection itself is the app's.
  */
 class FamilyLinkService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -28,10 +28,12 @@ class FamilyLinkService : Service() {
         super.onDestroy()
     }
 
-    /** The app was swiped away from the recent apps: the connection went with it, so the notification should not stay. */
+    /**
+     * The app was swiped away from the recent apps. The app goes on: its engine belongs to the
+     * process (see MainActivity), and this service keeps the process alive, so the connections to the
+     * family's phones, and the notifications about what they do, continue. Opening the app shows it again.
+     */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 

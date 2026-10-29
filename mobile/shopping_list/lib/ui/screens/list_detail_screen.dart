@@ -7,6 +7,7 @@ import '../../data/repository.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/in_app_banner.dart';
 import '../widgets/top_bar.dart';
 import 'item_form_screen.dart';
 
@@ -45,7 +46,9 @@ class ListDetailScreen extends StatelessWidget {
     final inCart = items.where((i) => i.status == ItemStatus.inCart).length;
     final allInCart = toBuy + inCart > 0 && toBuy == 0;
 
-    return Scaffold(
+    return ViewingMarker(
+      listUuid: listUuid,
+      child: Scaffold(
       appBar: AppBar(
         title: Text(list.name, style: const TextStyle(fontSize: 18)),
         actions: const [ThemeToggle(), SizedBox(width: 12)],
@@ -107,7 +110,7 @@ class ListDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

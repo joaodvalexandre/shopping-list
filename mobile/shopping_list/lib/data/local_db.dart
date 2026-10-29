@@ -41,9 +41,14 @@ class LocalDb implements LocalStore {
   static Future<LocalDb> open({String? path}) async {
     final db = await openDatabase(
       path ?? p.join(await getDatabasesPath(), 'shopping_list.db'),
-      version: 2,
+      version: 3,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createContentTables(db);
+        if (oldVersion < 3) {
+          // who last changed each list and item (an offline family tells who did what)
+          await db.execute('ALTER TABLE lists ADD COLUMN author TEXT');
+          await db.execute('ALTER TABLE items ADD COLUMN author TEXT');
+        }
       },
       onCreate: (db, version) async {
         await _createContentTables(db);
@@ -54,7 +59,8 @@ class LocalDb implements LocalStore {
             name_changed_at INTEGER NOT NULL,
             list_type_id INTEGER NOT NULL,
             hidden_from TEXT NOT NULL DEFAULT '[]',
-            pending TEXT NOT NULL DEFAULT '{}'
+            pending TEXT NOT NULL DEFAULT '{}',
+            author TEXT
           )''');
         await db.execute('''
           CREATE TABLE items (
@@ -66,7 +72,8 @@ class LocalDb implements LocalStore {
             quantity_changed_at INTEGER NOT NULL,
             status TEXT NOT NULL,
             status_changed_at INTEGER NOT NULL,
-            pending TEXT NOT NULL DEFAULT '{}'
+            pending TEXT NOT NULL DEFAULT '{}',
+            author TEXT
           )''');
         await db.execute('CREATE INDEX items_list ON items (list_uuid)');
         await db.execute('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)');

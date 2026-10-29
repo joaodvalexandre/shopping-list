@@ -21,6 +21,7 @@ class SyncService extends ChangeNotifier {
     this.onSynced,
     this.watchEvery = const Duration(seconds: 4),
     this.connectivityChanges,
+    this.keepInBackground,
   }) {
     repository.onLocalChange = requestSoon;
   }
@@ -34,6 +35,10 @@ class SyncService extends ChangeNotifier {
 
   /// How often, while the app is on screen, the server is asked whether anything changed.
   final Duration watchEvery;
+
+  /// True when the person asked the app to keep running with the screen off or closed: then the
+  /// watcher goes on, and what others do is told by notifications at once.
+  final bool Function()? keepInBackground;
 
   /// When the phone's connection changes (the platform's, unless a test provides its own).
   final Stream<List<ConnectivityResult>>? connectivityChanges;
@@ -89,13 +94,13 @@ class SyncService extends ChangeNotifier {
     _foreground = foreground;
     if (foreground) {
       if (_periodic != null) _startWatching();
-    } else {
+    } else if (!(keepInBackground?.call() ?? false)) {
       _stopWatching();
     }
   }
 
   void _startWatching() {
-    if (!_foreground) return;
+    if (!_foreground && !(keepInBackground?.call() ?? false)) return;
     _watcher ??= Timer.periodic(watchEvery, (_) => _watch());
   }
 

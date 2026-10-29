@@ -384,7 +384,7 @@ class LocalPeerSession {
     final sent = (offer['lists'] as List).length + (offer['items'] as List).length + (offer['gone'] as List).length;
 
     final theirOffer = await inbox.receive('offer', timeout);
-    final applied = await repository.applyLocalDelta(theirOffer, peerId: rightsOf);
+    final applied = await repository.applyLocalDelta(theirOffer, peerId: rightsOf, peerName: peerName);
 
     if (peerId != null) repository.noteSeen(peerId);
 

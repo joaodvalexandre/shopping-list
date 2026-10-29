@@ -25,7 +25,9 @@ it('records what happens on a list, and who did it', function () {
         $item = $list->items()->create(['name' => 'Milk', 'quantity' => 2, 'status_id' => 1]);
         $item->update(['status_id' => 2]);
         $item->update(['status_id' => 3]);
-        $item->update(['name' => 'Oat milk', 'quantity' => 3]);   // not news
+        $item->update(['name' => 'Oat milk', 'quantity' => 3]);
+        $item->update(['status_id' => 1]);   // taken out of the cart again
+        $item->delete();
     });
 
     $kinds = Activity::orderBy('id')->get()->map(fn (Activity $a) => [$a->kind, $a->subject, $a->actor_id])->all();
@@ -34,7 +36,10 @@ it('records what happens on a list, and who did it', function () {
         ->and($kinds)->toContain(['item_in_cart', 'Milk', $this->bia->id])
         ->and($kinds)->toContain(['item_purchased', 'Milk', $this->bia->id])
         ->and(collect($kinds)->where(0, 'item_added'))->toHaveCount(1)
-        ->and(Activity::count())->toBe(count($kinds));   // the rename and quantity change left nothing behind
+        ->and($kinds)->toContain(['item_changed', 'Oat milk', $this->bia->id])   // renamed, quantity changed
+        ->and($kinds)->toContain(['item_returned', 'Oat milk', $this->bia->id])   // back to be bought
+        ->and($kinds)->toContain(['item_removed', 'Oat milk', $this->bia->id])
+        ->and(Activity::count())->toBe(count($kinds));
 });
 
 it('records a created list', function () {

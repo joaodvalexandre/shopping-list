@@ -14,8 +14,8 @@ use Illuminate\Database\QueryException;
  */
 class ActivityRecorder
 {
-    /** Item status ids (see StatusSeeder). */
-    private const STATUS_KINDS = [2 => Activity::ITEM_IN_CART, 3 => Activity::ITEM_PURCHASED];
+    /** Item status ids (see StatusSeeder): what moving an item to each one is called. */
+    private const STATUS_KINDS = [1 => Activity::ITEM_RETURNED, 2 => Activity::ITEM_IN_CART, 3 => Activity::ITEM_PURCHASED];
 
     /** How long the feed is kept: a phone that was off for longer simply misses the oldest. */
     public const KEEP_DAYS = 14;
@@ -25,14 +25,32 @@ class ActivityRecorder
         self::record($item->shoppingList()->withTrashed()->first(), Activity::ITEM_ADDED, $item);
     }
 
-    /** Only a change of status is news; renaming an item or changing its quantity is not. */
+    /**
+     * What was done to an item: moved through the cart, or renamed / its quantity changed. When an
+     * update does both, the move through the cart is what is told.
+     */
     public static function itemChanged(Item $item): void
     {
-        $kind = self::STATUS_KINDS[(int) $item->status_id] ?? null;
+        $list = $item->shoppingList()->withTrashed()->first();
 
-        if ($kind !== null && $item->wasChanged('status_id')) {
-            self::record($item->shoppingList()->withTrashed()->first(), $kind, $item);
+        if ($item->wasChanged('status_id')) {
+            $kind = self::STATUS_KINDS[(int) $item->status_id] ?? null;
+
+            if ($kind !== null) {
+                self::record($list, $kind, $item);
+            }
+
+            return;
         }
+
+        if ($item->wasChanged(['name', 'quantity'])) {
+            self::record($list, Activity::ITEM_CHANGED, $item);
+        }
+    }
+
+    public static function itemRemoved(Item $item): void
+    {
+        self::record($item->shoppingList()->withTrashed()->first(), Activity::ITEM_REMOVED, $item);
     }
 
     public static function listCreated(ShoppingList $list): void

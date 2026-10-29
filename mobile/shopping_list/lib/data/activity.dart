@@ -48,12 +48,15 @@ class ActivityPage {
 
 /// One notification: the list it is about, and a line per thing that happened there.
 class ActivityNotice {
-  const ActivityNotice({required this.listUuid, required this.title, required this.lines, required this.lastEventId});
+  const ActivityNotice({required this.listUuid, required this.title, required this.lines, required this.lastEventId, this.kind = 'item_added'});
 
   final String listUuid;
   final String title;
   final List<String> lines;
   final int lastEventId;
+
+  /// What the last thing was (for the icon of an in-app banner).
+  final String kind;
 
   String get body => lines.join('\n');
 }
@@ -74,6 +77,7 @@ List<ActivityNotice> buildNotices(List<ActivityEvent> events, String Function(St
         title: entry.value.first.list,
         lines: _lines(entry.value, t),
         lastEventId: entry.value.last.id,
+        kind: entry.value.last.kind,
       ),
   ];
 }
@@ -97,14 +101,25 @@ String _line(String? actor, String kind, List<ActivityEvent> events, String Func
   if (kind == 'list_created') {
     return t('app_notice_list_created', {'name': who, 'list': first.list});
   }
+  if (kind == 'list_removed') {
+    return t('app_notice_list_removed', {'name': who, 'list': first.list});
+  }
 
   final key = switch (kind) {
     'item_in_cart' => 'app_notice_item_in_cart',
     'item_purchased' => 'app_notice_item_purchased',
+    'item_returned' => 'app_notice_item_returned',
+    'item_removed' => 'app_notice_item_removed',
+    'item_changed' => 'app_notice_item_changed',
     _ => 'app_notice_item_added',
   };
 
-  return events.length == 1
-      ? t(key, {'name': who, 'item': first.item ?? '', 'list': first.list})
-      : t('${key}_many', {'name': who, 'count': events.length, 'list': first.list});
+  if (events.length > 1) {
+    return t('${key}_many', {'name': who, 'count': events.length, 'list': first.list});
+  }
+
+  // Said with how many, when it is more than one
+  final quantity = first.quantity ?? 1;
+  final single = kind == 'item_added' && quantity > 1 ? '${key}_qty' : key;
+  return t(single, {'name': who, 'item': first.item ?? '', 'list': first.list, 'quantity': quantity});
 }

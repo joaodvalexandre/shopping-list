@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,7 +13,8 @@ abstract class NoticeSink {
   /// Android 13 and later ask before showing any notification. True when allowed.
   Future<bool> requestPermission();
 
-  Future<void> show({required int id, required String title, required String body, required String payload});
+  /// [lines] are the separate things that happened (shown one under the other when there are several).
+  Future<void> show({required int id, required String title, required String body, required String payload, List<String> lines = const []});
 }
 
 /// Tells people what others did on the family's lists, as phone notifications.
@@ -30,6 +32,28 @@ class NotificationService {
   final NoticeSink sink;
 
   static const enabledKey = 'notifications';
+
+  /// Which things a person wants to hear about, each a switch in Settings (all on until switched off).
+  static const kindPrefs = {
+    'item_added': 'notify_added',
+    'list_created': 'notify_added',
+    'item_in_cart': 'notify_cart',
+    'item_returned': 'notify_cart',
+    'item_purchased': 'notify_bought',
+    'item_changed': 'notify_changes',
+    'item_removed': 'notify_changes',
+    'list_removed': 'notify_changes',
+  };
+
+  /// A banner inside the app, for what happens while the person is using it (on another screen than the list).
+  static const inAppKey = 'notify_in_app';
+
+  bool get inAppEnabled => prefs.getBool(inAppKey) ?? true;
+
+  bool wantsKind(String kind) => prefs.getBool(kindPrefs[kind] ?? 'notify_added') ?? true;
+
+  /// Where an in-app banner goes (the screen shows it).
+  void Function(List<ActivityNotice> notices)? onInApp;
 
   /// How far into the server's feed this phone has got (cleared on sign-out with the rest of the local data).
   static const cursorKey = 'activity_cursor';
@@ -56,9 +80,8 @@ class NotificationService {
   String _text(String key, Map<String, Object> params) =>
       content.translate(prefs.getString(SettingsState.effectiveLanguageKey) ?? content.defaultLanguage, key, params);
 
-  /// Ask the server what is new. In the foreground the person sees it happen in the lists, so
-  /// only the cursor moves; in the background each list with news gets a notification.
-  /// Returns how many notifications were shown. Quiet when the server cannot be reached.
+  /// Ask the server what is new. On screen, what is new becomes banners inside the app; off screen,
+  /// each list with news gets a notification. Returns how many were shown. Quiet when the server cannot be reached.
   Future<int> check(ApiClient api, {required bool foreground}) async {
     final stored = int.tryParse(await store.getMeta(cursorKey) ?? '');
 
@@ -75,21 +98,39 @@ class NotificationService {
       return 0;
     }
 
-    var shown = 0;
-    if (enabled && !foreground) {
-      for (final notice in buildNotices(page.events, _text)) {
-        await sink.show(
-          id: (notice.listUuid.hashCode ^ notice.lastEventId) & 0x7fffffff,
-          title: notice.title,
-          body: notice.body,
-          payload: notice.listUuid,
-        );
-        shown++;
-      }
-    }
+    final shown = await deliver(page.events, onScreen: foreground);
 
     if (page.lastId > stored) await store.setMeta(cursorKey, '${page.lastId}');
     return shown;
+  }
+
+  /// Tell the person what others did. With the app on screen it is a banner inside the app; with
+  /// it off screen (or closed), a phone notification, one per list, with a line for each thing
+  /// that was done. Only the kinds of thing this person wants to hear about. Returns how many.
+  Future<int> deliver(List<ActivityEvent> all, {required bool onScreen}) async {
+    final events = all.where((event) => wantsKind(event.kind)).toList();
+    if (events.isEmpty) return 0;
+
+    final notices = buildNotices(events, _text);
+
+    if (onScreen) {
+      if (!inAppEnabled || onInApp == null) return 0;
+      onInApp!(notices);
+      return notices.length;
+    }
+
+    if (!enabled) return 0;
+    for (final notice in notices) {
+      await sink.show(
+        // (what an offline family tells has no number of its own: the time makes each notification its own)
+        id: (notice.listUuid.hashCode ^ (notice.lastEventId != 0 ? notice.lastEventId : DateTime.now().millisecondsSinceEpoch)) & 0x7fffffff,
+        title: notice.title,
+        body: notice.body,
+        payload: notice.listUuid,
+        lines: notice.lines,
+      );
+    }
+    return notices.length;
   }
 }
 
@@ -129,19 +170,23 @@ class LocalNoticeSink implements NoticeSink {
   }
 
   @override
-  Future<void> show({required int id, required String title, required String body, required String payload}) {
+  Future<void> show({required int id, required String title, required String body, required String payload, List<String> lines = const []}) {
     return _plugin.show(
       id: id,
       title: title,
-      body: body,
+      body: lines.length == 1 ? lines.first : body.split('\n').first,
       payload: payload,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
           'Cestou',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-          styleInformation: BigTextStyleInformation(body),
+          importance: Importance.high,
+          priority: Priority.high,
+          color: const Color(0xFF16A34A),
+          // one thing: its sentence; several: a line for each, under the list's name
+          styleInformation: lines.length > 1
+              ? InboxStyleInformation(lines, contentTitle: title, summaryText: '${lines.length}')
+              : BigTextStyleInformation(body, contentTitle: title),
         ),
       ),
     );

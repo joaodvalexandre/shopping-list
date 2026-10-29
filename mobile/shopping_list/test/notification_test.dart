@@ -32,6 +32,13 @@ final texts = {
     'app_notice_item_purchased': ':name bought :item',
     'app_notice_item_purchased_many': ':name bought :count items',
     'app_notice_list_created': ':name created this list',
+    'app_notice_item_added_qty': ':name added :item (x:quantity)',
+    'app_notice_item_returned': ':name took :item out of the cart',
+    'app_notice_item_returned_many': ':name took :count items out of the cart',
+    'app_notice_item_changed': ':name changed :item (x:quantity)',
+    'app_notice_item_removed': ':name removed :item',
+    'app_notice_item_removed_many': ':name removed :count items',
+    'app_notice_list_removed': ':name deleted this list',
   },
   'pt': {'app_notice_item_added': ':name adicionou :item'},
 };
@@ -175,5 +182,78 @@ void main() {
 
     expect(page.events, isEmpty);
     expect(page.lastId, 7);
+  });
+
+  group('what others did, in words and where it is told', () {
+    String english(String key, Map<String, Object> params) {
+      var text = texts['en']![key] ?? key;
+      params.forEach((name, value) => text = text.replaceAll(':$name', value.toString()));
+      return text;
+    }
+
+    ActivityEvent made(String kind, {String? actor = 'Bia', String list = 'Barbecue', String? item, int? quantity, int id = 0}) =>
+        ActivityEvent(id: id, kind: kind, actor: actor, listUuid: 'list-1', list: list, item: item, quantity: quantity);
+
+    test('every kind of thing is said as what was done, with how many when it is more than one', () async {
+      await setUpService();
+
+      final lines = buildNotices([
+        made('item_added', item: 'Sausages', quantity: 4),
+        made('item_returned', item: 'Beer', actor: 'Rui'),
+        made('item_changed', item: 'Bread', quantity: 3, actor: 'Joana'),
+        made('item_removed', item: 'Milk', actor: 'Bia'),
+        made('list_removed', actor: 'Ana'),
+      ], (key, params) => english(key, params)).single.lines;
+
+      expect(lines, [
+        'Bia added Sausages (x4)',
+        'Rui took Beer out of the cart',
+        'Joana changed Bread (x3)',
+        'Bia removed Milk',
+        'Ana deleted this list',
+      ]);
+    });
+
+    test('several of the same by one person become one line', () async {
+      await setUpService();
+
+      final lines = buildNotices([
+        made('item_removed', item: 'A'),
+        made('item_removed', item: 'B'),
+        made('item_removed', item: 'C'),
+      ], (key, params) => english(key, params)).single.lines;
+
+      expect(lines, ['Bia removed 3 items']);
+    });
+
+    test('with the app on screen it is a banner in the app, with it off screen a phone notification', () async {
+      await setUpService();
+      final banners = <ActivityNotice>[];
+      service.onInApp = banners.addAll;
+
+      await service.deliver([made('item_added', item: 'Milk', quantity: 1)], onScreen: true);
+      expect(banners.single.title, 'Barbecue');
+      expect(banners.single.lines, ['Bia added Milk']);
+      expect(sink.shown, isEmpty);
+
+      await service.deliver([made('item_in_cart', item: 'Milk'), made('item_purchased', item: 'Beer')], onScreen: false);
+      expect(sink.shown.single.title, 'Barbecue');
+      expect(sink.shown.single.lines, ['Bia put Milk in the cart', 'Bia bought Beer']);
+    });
+
+    test('only what the person asked to hear about, and each channel can be switched off', () async {
+      await setUpService(values: {'notify_cart': false, 'notify_in_app': false});
+      final banners = <ActivityNotice>[];
+      service.onInApp = banners.addAll;
+
+      // the cart is not wanted; the banner is switched off
+      expect(await service.deliver([made('item_in_cart', item: 'Milk')], onScreen: false), 0);
+      expect(await service.deliver([made('item_added', item: 'Milk')], onScreen: true), 0);
+      expect(banners, isEmpty);
+
+      // adding is wanted, as a phone notification
+      expect(await service.deliver([made('item_added', item: 'Milk')], onScreen: false), 1);
+      expect(sink.shown.single.lines, ['Bia added Milk']);
+    });
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/time.dart';
+import 'activity.dart';
 import 'local_db.dart';
 import 'me.dart';
 import 'models.dart';
@@ -124,6 +125,9 @@ class Repository extends ChangeNotifier {
 
   Me? get me => _me;
 
+  /// This phone's person, for putting a name to what they change.
+  String get _myName => _me?.name ?? '';
+
   /// A local family (no server, ever): its changes are never "waiting for the server", and what
   /// the phones of the family hold is compared and completed between them (see [buildLocalDigest]).
   bool _local = false;
@@ -210,6 +214,7 @@ class Repository extends ChangeNotifier {
       listTypeId: listTypeId,
       hiddenFrom: List.of(hiddenFrom),
       pending: Pending({Pending.created: at}),
+      author: _myName,
     );
 
     _lists[list.uuid] = list;
@@ -222,6 +227,7 @@ class Repository extends ChangeNotifier {
     if (list == null) return;
 
     final at = nowMs();
+    list.author = _myName;
     if (name.trim() != list.name) {
       list.name = name.trim();
       list.nameChangedAt = at;
@@ -266,6 +272,7 @@ class Repository extends ChangeNotifier {
       status: ItemStatus.toBuy,
       statusChangedAt: at,
       pending: Pending({Pending.created: at}),
+      author: _myName,
     );
 
     list.items.add(item);
@@ -278,6 +285,7 @@ class Repository extends ChangeNotifier {
     if (item == null) return;
 
     final at = nowMs();
+    item.author = _myName;
     if (name.trim() != item.name) {
       item.name = name.trim();
       item.nameChangedAt = at;
@@ -299,6 +307,7 @@ class Repository extends ChangeNotifier {
     final at = nowMs();
     item.status = status;
     item.statusChangedAt = at;
+    item.author = _myName;
     item.pending.mark('status', at);
     _changed(saveItems: [item]);
   }
@@ -313,6 +322,7 @@ class Repository extends ChangeNotifier {
     for (final item in list.items.where((i) => i.status == ItemStatus.inCart && !i.pending.isDeleted)) {
       item.status = ItemStatus.purchased;
       item.statusChangedAt = at;
+      item.author = _myName;
       item.pending.mark('status', at);
       changed.add(item);
     }
@@ -906,9 +916,9 @@ class Repository extends ChangeNotifier {
   }
 
   /// Note that something was deleted, so that a phone nearby cannot bring it back.
-  void _remember(String uuid, {required bool list, int? type, String? listUuid, int? at}) {
+  void _remember(String uuid, {required bool list, int? type, String? listUuid, int? at, String? by}) {
     final now = nowMs();
-    _tombstones[uuid] = {'at': at ?? now, 'kind': list ? 'list' : 'item', 'type': ?type, 'list': ?listUuid};
+    _tombstones[uuid] = {'at': at ?? now, 'kind': list ? 'list' : 'item', 'type': ?type, 'list': ?listUuid, 'by': ?(by ?? (_local ? _myName : null))};
     final keep = _local ? _localTombstoneKeepMs : _tombstoneKeepMs;
     _tombstones.removeWhere((_, entry) => now - ((entry['at'] as num?)?.toInt() ?? 0) > keep);
     _db.setMeta(_tombstoneMetaKey, jsonEncode(_tombstones));
@@ -1449,7 +1459,7 @@ class Repository extends ChangeNotifier {
       }
 
       if (older(theirLists[list.uuid], list.nameChangedAt)) {
-        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt, 'type': list.listTypeId, 'hidden': list.hiddenFrom});
+        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt, 'type': list.listTypeId, 'hidden': list.hiddenFrom, 'by': list.author});
       }
 
       for (final item in list.items) {
@@ -1471,6 +1481,7 @@ class Repository extends ChangeNotifier {
             'quantity_at': item.quantityChangedAt,
             'status': item.status.code,
             'status_at': item.statusChangedAt,
+            'by': item.author,
           });
         }
       }
@@ -1493,7 +1504,7 @@ class Repository extends ChangeNotifier {
         'member' => theirMembers.containsKey(key.substring('member:'.length)),
         _ => theirItems.containsKey(key),
       };
-      if (held) gone.add({'uuid': key, 'kind': kind, 'at': entry['at'], 'list': entry['list'], 'type': entry['type']});
+      if (held) gone.add({'uuid': key, 'kind': kind, 'at': entry['at'], 'list': entry['list'], 'type': entry['type'], 'by': entry['by']});
     });
 
     return {
@@ -1510,7 +1521,7 @@ class Repository extends ChangeNotifier {
   /// Take in what another phone of the family sent: deletions first (they win), then the family
   /// itself, lists and items, each field only when it is newer than what is held, and only what
   /// [peerId] may do (a change they have no right to is left out, and never passed on).
-  Future<PeerApplied> applyLocalDelta(Map<String, dynamic> delta, {String? peerId}) async {
+  Future<PeerApplied> applyLocalDelta(Map<String, dynamic> delta, {String? peerId, String? peerName}) async {
     final applied = PeerApplied();
     if (!_local || _me == null) return applied;
 
@@ -1523,6 +1534,16 @@ class Repository extends ChangeNotifier {
     bool newer(Object? at, int held) => at is num && at.toInt() > held;
     bool can(int typeId, Ability ability) => _memberCan(peerId, typeId, ability);
     final myNumber = _localMembers[_localMyId]?.number;
+
+    // Who did it: told with the change; failing that, the phone it came from
+    String? who(Map<String, dynamic> entry) {
+      final by = entry['by'];
+      return by is String && by.trim().isNotEmpty ? by.trim() : peerName;
+    }
+
+    void happened(String kind, Map<String, dynamic> entry, String listUuid, String listName, {String? item, int? quantity}) {
+      applied.events.add(ActivityEvent(id: 0, kind: kind, actor: who(entry), listUuid: listUuid, list: listName, item: item, quantity: quantity));
+    }
 
     final records = <({LocalMember member, Map<String, dynamic> perm})>[];
 
@@ -1636,9 +1657,10 @@ class Repository extends ChangeNotifier {
           final type = list?.listTypeId ?? (entry['type'] as num?)?.toInt() ?? localTypeId;
           if (!can(type, Ability.manageLists)) continue;
 
-          _remember(uuid, list: true, type: type, at: at);
+          _remember(uuid, list: true, type: type, at: at, by: entry['by'] as String?);
           if (list == null) continue;
 
+          happened('list_removed', entry, uuid, list.name);
           _lists.remove(uuid);
           removeLists.add(uuid);
           for (final item in list.items) {
@@ -1654,9 +1676,10 @@ class Repository extends ChangeNotifier {
           // What is in the cart is about to be bought: it stays, here
           if (item != null && item.status == ItemStatus.inCart) continue;
 
-          _remember(uuid, list: false, listUuid: listUuid, at: at);
+          _remember(uuid, list: false, listUuid: listUuid, at: at, by: entry['by'] as String?);
           if (item == null) continue;
 
+          happened('item_removed', entry, listUuid!, _lists[listUuid]!.name, item: item.name, quantity: item.quantity);
           _lists[listUuid]!.items.remove(item);
           removeItems.add(uuid);
           applied.items++;
@@ -1708,10 +1731,12 @@ class Repository extends ChangeNotifier {
           listTypeId: typeId,
           hiddenFrom: hidden,
         );
+        created.author = who(entry);
         _lists[uuid] = created;
         saveLists.add(created);
         applied.lists++;
         applied.added.add(name);
+        happened('list_created', entry, uuid, name);
       } else if (newer(entry['name_at'], existing.nameChangedAt) && can(existing.listTypeId, Ability.manageLists)) {
         if (myNumber != null && hidden.contains(myNumber)) {
           // it was hidden from this phone's person: it is not theirs to hold any more
@@ -1725,6 +1750,7 @@ class Repository extends ChangeNotifier {
 
         existing.name = name;
         existing.hiddenFrom = hidden;
+        existing.author = who(entry);
         existing.nameChangedAt = (entry['name_at'] as num).toInt();
         saveLists.add(existing);
         applied.lists++;
@@ -1756,32 +1782,50 @@ class Repository extends ChangeNotifier {
           status: status,
           statusChangedAt: (entry['status_at'] as num?)?.toInt() ?? nowMs(),
         );
+        created.author = who(entry);
         list.items.add(created);
         saveItems.add(created);
         applied.items++;
         applied.added.add(name);
+        happened('item_added', entry, list.uuid, list.name, item: name, quantity: created.quantity);
         continue;
       }
 
-      var changed = false;
+      var edited = false;
+      ItemStatus? movedTo;
       if (can(type, Ability.editItems) && newer(entry['name_at'], existing.nameChangedAt)) {
         existing.name = name;
         existing.nameChangedAt = (entry['name_at'] as num).toInt();
-        changed = true;
+        edited = true;
       }
       if (can(type, Ability.editItems) && entry['quantity'] is num && newer(entry['quantity_at'], existing.quantityChangedAt)) {
         existing.quantity = (entry['quantity'] as num).toInt().clamp(1, 9999);
         existing.quantityChangedAt = (entry['quantity_at'] as num).toInt();
-        changed = true;
+        edited = true;
       }
       if (can(type, Ability.changeStatus) && entry['status'] is String && newer(entry['status_at'], existing.statusChangedAt)) {
-        existing.status = ItemStatus.fromCode(entry['status'] as String);
+        final status = ItemStatus.fromCode(entry['status'] as String);
+        if (status != existing.status) movedTo = status;
+        existing.status = status;
         existing.statusChangedAt = (entry['status_at'] as num).toInt();
-        changed = true;
+        edited = true;
       }
-      if (changed) {
+      if (edited) {
+        existing.author = who(entry);
         saveItems.add(existing);
         applied.items++;
+
+        // What was done: moved through the cart, or renamed / changed in quantity
+        if (movedTo != null) {
+          final kind = switch (movedTo) {
+            ItemStatus.inCart => 'item_in_cart',
+            ItemStatus.purchased => 'item_purchased',
+            ItemStatus.toBuy => 'item_returned',
+          };
+          happened(kind, entry, list.uuid, list.name, item: existing.name, quantity: existing.quantity);
+        } else {
+          happened('item_changed', entry, list.uuid, list.name, item: existing.name, quantity: existing.quantity);
+        }
       }
     }
 

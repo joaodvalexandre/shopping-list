@@ -14,6 +14,7 @@ class FamilyLink {
       : _channel = channel ?? const MethodChannel('app.cestou.mobile/family_link') {
     auth.addListener(update);
     nearby.addListener(update);
+    settings.addListener(update);
   }
 
   final AuthState auth;
@@ -24,10 +25,17 @@ class FamilyLink {
   bool _running = false;
   String? _text;
 
-  bool get _wanted => auth.isLocal && auth.status == AuthStatus.signedIn && nearby.enabled;
+  /// An offline family always (its phones only talk through the app); a server family when the person
+  /// asked for the app to keep running, to be told at once what others do.
+  bool get _wanted {
+    if (auth.status != AuthStatus.signedIn) return false;
+    return auth.isLocal ? nearby.enabled : settings.keepRunning;
+  }
 
   /// What the notification says: connected to someone, syncing, or looking.
   String get statusText {
+    if (!auth.isLocal) return settings.t('app_link_watching');
+
     final who = nearby.currentPeer ?? '';
 
     return switch (nearby.state) {
@@ -51,7 +59,7 @@ class FamilyLink {
     final text = statusText;
     if (_running && text == _text) return;
 
-    final title = settings.t('app_link_title');
+    final title = settings.t(auth.isLocal ? 'app_link_title' : 'app_link_title_online');
     final wasRunning = _running;
     _running = true;
     _text = text;
@@ -83,5 +91,6 @@ class FamilyLink {
   void dispose() {
     auth.removeListener(update);
     nearby.removeListener(update);
+    settings.removeListener(update);
   }
 }

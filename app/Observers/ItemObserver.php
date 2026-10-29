@@ -23,6 +23,7 @@ class ItemObserver
     public function deleted(Item $item): void
     {
         $this->announce($item, 'deleted');
+        ActivityRecorder::itemRemoved($item);
     }
 
     private function announce(Item $item, string $action): void

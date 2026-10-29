@@ -1,64 +1,100 @@
 package app.cestou.mobile
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugins.GeneratedPluginRegistrant
 
+/**
+ * The screen of the app. The app itself (its Dart code, the connections to the family's phones, the
+ * checks that raise notifications) lives in an engine that belongs to the process, not to this
+ * screen: closing the screen, or swiping the app away from the recent apps, leaves it running for as
+ * long as the foreground service keeps the process alive. Opening the screen again just shows it.
+ */
 class MainActivity : FlutterActivity() {
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
+    override fun provideFlutterEngine(context: Context): FlutterEngine? = engine(context.applicationContext)
+
+    // The engine outlives this screen
+    override fun shouldDestroyEngineWithHost(): Boolean = false
+
+    companion object {
+        private const val ENGINE_ID = "cestou_main"
+
+        /** The app's engine: made once, the first time the screen opens, and kept. */
+        fun engine(app: Context): FlutterEngine {
+            val cache = FlutterEngineCache.getInstance()
+            cache.get(ENGINE_ID)?.let { return it }
+
+            val engine = FlutterEngine(app)
+            GeneratedPluginRegistrant.registerWith(engine)
+            registerChannels(engine, app)
+            engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+
+            cache.put(ENGINE_ID, engine)
+            return engine
+        }
 
         // The app asks for the notification that keeps it alive in the background (or to drop it)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.cestou.mobile/family_link").setMethodCallHandler { call, result ->
-            when (call.method) {
-                "start" -> {
-                    val intent = Intent(this, FamilyLinkService::class.java)
-                        .putExtra(FamilyLinkService.EXTRA_TITLE, call.argument<String>("title"))
-                        .putExtra(FamilyLinkService.EXTRA_TEXT, call.argument<String>("text"))
+        private fun registerChannels(engine: FlutterEngine, app: Context) {
+            MethodChannel(engine.dartExecutor.binaryMessenger, "app.cestou.mobile/family_link").setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        val intent = Intent(app, FamilyLinkService::class.java)
+                            .putExtra(FamilyLinkService.EXTRA_TITLE, call.argument<String>("title"))
+                            .putExtra(FamilyLinkService.EXTRA_TEXT, call.argument<String>("text"))
 
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.success(false) // not allowed right now (the app is not in a state to start it)
-                    }
-                }
-                "update" -> {
-                    FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Cestou", call.argument<String>("text") ?: "")
-                    result.success(FamilyLinkService.instance != null)
-                }
-                "stop" -> {
-                    stopService(Intent(this, FamilyLinkService::class.java))
-                    result.success(true)
-                }
-                // Is the app allowed to go on running in the background (not stopped to save battery)?
-                "batteryExempt" -> {
-                    val power = getSystemService(POWER_SERVICE) as PowerManager
-                    result.success(power.isIgnoringBatteryOptimizations(packageName))
-                }
-                "askBatteryExemption" -> {
-                    try {
-                        startActivity(
-                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                                .setData(Uri.parse("package:$packageName")),
-                        )
-                        result.success(true)
-                    } catch (e: Exception) {
-                        // some phones have no such screen: the app's own settings page instead
                         try {
-                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) app.startForegroundService(intent) else app.startService(intent)
                             result.success(true)
-                        } catch (e2: Exception) {
-                            result.success(false)
+                        } catch (e: Exception) {
+                            result.success(false) // not allowed right now (the app is not in a state to start it)
                         }
                     }
+                    "update" -> {
+                        FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Cestou", call.argument<String>("text") ?: "")
+                        result.success(FamilyLinkService.instance != null)
+                    }
+                    "stop" -> {
+                        app.stopService(Intent(app, FamilyLinkService::class.java))
+                        result.success(true)
+                    }
+                    // Is the app allowed to go on running in the background (not stopped to save battery)?
+                    "batteryExempt" -> {
+                        val power = app.getSystemService(Context.POWER_SERVICE) as PowerManager
+                        result.success(power.isIgnoringBatteryOptimizations(app.packageName))
+                    }
+                    "askBatteryExemption" -> {
+                        try {
+                            app.startActivity(
+                                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                    .setData(Uri.parse("package:${app.packageName}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                            result.success(true)
+                        } catch (e: Exception) {
+                            // some phones have no such screen: the app's own settings page instead
+                            try {
+                                app.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                        .setData(Uri.parse("package:${app.packageName}"))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                                result.success(true)
+                            } catch (e2: Exception) {
+                                result.success(false)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
-                else -> result.notImplemented()
             }
         }
     }

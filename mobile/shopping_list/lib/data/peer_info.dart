@@ -1,4 +1,5 @@
 import '../core/time.dart';
+import 'activity.dart';
 import 'me.dart';
 
 /// Who a phone nearby says it belongs to, and what its person may do: the contents of a
@@ -61,6 +62,9 @@ class PeerApplied {
 
   /// Names of the items and lists that are new here (a few, for a notification to say).
   final List<String> added = [];
+
+  /// What the others did, one event each (who, what, to which list and item): what the notifications say.
+  final List<ActivityEvent> events = [];
 
   /// The family itself changed (its people, list types, name or admin): not counted above, but news to pass on.
   bool family = false;

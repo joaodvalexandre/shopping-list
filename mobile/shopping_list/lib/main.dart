@@ -24,6 +24,7 @@ import 'ui/screens/first_login_screen.dart';
 import 'ui/screens/home_shell.dart';
 import 'ui/screens/list_detail_screen.dart';
 import 'ui/screens/login_screen.dart';
+import 'ui/widgets/in_app_banner.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/top_bar.dart';
 
@@ -54,6 +55,7 @@ Future<void> main() async {
   // A local family proves who is who with this phone's key
   await repository.attachSigner(localSignerFor(identity));
   final sync = SyncService(
+    keepInBackground: () => settings.keepRunning,
     api: api,
     repository: repository,
     auth: auth,
@@ -85,25 +87,21 @@ Future<void> main() async {
     localFamily: localFamily,
     // A local family keeps its phones connected with the app off screen (with a notification showing)
     keepInBackground: () => auth.isLocal,
+    // What the family's other phones did: a banner in the app while it is on screen, a notification otherwise
     onNews: (result) {
-      // Nobody is looking at the app: say what came in (with it on screen the person sees it arrive)
       final lifecycle = WidgetsBinding.instance.lifecycleState;
-      if (lifecycle == null || lifecycle == AppLifecycleState.resumed) return;
-      if (prefs.getBool(NotificationService.enabledKey) == false) return;
-
-      final what = result.applied.added.isNotEmpty
-          ? result.applied.added.take(4).join(', ')
-          : settings.t('app_link_news_changes', {'count': result.applied.total});
-
-      sink.show(
-        id: 7100,
-        title: settings.t('app_link_news_title', {'name': result.peerName ?? ''}),
-        body: what,
-        payload: '',
-      );
+      final onScreen = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+      notifications.deliver(result.applied.events, onScreen: onScreen);
     },
   );
   final link = FamilyLink(auth: auth, nearby: nearby, settings: settings);
+
+  // Banners inside the app, for what others do on lists the person is not looking at
+  notifications.onInApp = (notices) => InAppBanner.show(
+        notices,
+        navigatorKey: navigatorKey,
+        open: (uuid) => openListFromNotification(uuid, repository, auth),
+      );
 
   await auth.init();
 

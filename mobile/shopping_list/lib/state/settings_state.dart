@@ -101,6 +101,27 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Light, dark, or what the phone is set to.
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    await _prefs.setString('theme', switch (mode) {
+      ThemeMode.dark => 'dark',
+      ThemeMode.light => 'light',
+      ThemeMode.system => 'system',
+    });
+    notifyListeners();
+  }
+
+  /// A server family can ask for the app to keep running with the screen off or closed (a
+  /// notification stays), so what others do reaches the phone at once and not every quarter of an
+  /// hour. An offline family always does (its phones can only talk through the app).
+  bool get keepRunning => _prefs.getBool('keep_running') ?? false;
+
+  Future<void> setKeepRunning(bool on) async {
+    await _prefs.setBool('keep_running', on);
+    notifyListeners();
+  }
+
   Future<void> setServerUrl(String url) async {
     _serverUrl = url;
     await _prefs.setString('server', url);

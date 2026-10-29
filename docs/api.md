@@ -219,7 +219,7 @@ What others did on the family's lists, for the phone to turn into notifications.
 }
 ```
 
-- `kind` is `item_added`, `item_in_cart`, `item_purchased` or `list_created`. Renaming an item or changing its quantity is not news.
+- `kind` is `item_added`, `item_in_cart`, `item_purchased`, `item_returned` (taken out of the cart, back to be bought), `item_changed` (renamed, or its quantity changed; `item` and `quantity` are the new ones), `item_removed` or `list_created`. When one update both changes an item and moves it through the cart, the move is what is told.
 - Send the `last_id` you were given as `after` next time. **With no `after`** the answer is empty and only says where the feed stands, so a new install does not announce the past. A page holds up to 100; when it is full `last_id` stops at the last one sent, so ask again.
 - Events are kept for 14 days. A phone that was off for longer misses the oldest.
 
@@ -354,4 +354,10 @@ The app can be used with no account and no server: on the login page, "Use the a
 - **Roles**: like a server family, a person is an admin or a member, and an admin changes it (and what each member may do) on that person's page. Records are signed by the admin who made them, and believed when that admin is one on the receiving phone's list, so an admin made by an admin may make the next. The person who started the family is always an admin. A demoted admin's earlier records stay as they were; what they sign afterwards is nobody's word.
 - **Mesh**: a phone stays connected to *every* phone of its family in range (up to five), not one at a time. A change made on one phone is sent over all its connections at once, and what a phone takes in is passed on to its other connections, so a phone out of the first one's range gets it from the one in between. Nobody is a hub: any phone can relay, and when one leaves or goes out of range the others stay connected to each other.
 - **Staying alive**: an offline family runs an Android foreground service (a notification that stays) on every phone, and asks once to be let off battery optimisation ("Allow in the background" on the Family tab), because without it Android may stop the app when the screen has been off a while. Swiping the app away from the recent apps ends it (and the notification), and a phone that was restarted starts again when the app is opened.
+
+### Notifications that say what was done, and keeping the app alive when it is closed
+
+- **Wording**: each thing others did is a sentence with who and what ("Ana put Milk in the cart", "Bia took Eggs out of the cart", "Rui changed Bread (×3)", "Ana removed Rice", "Joana added Sausages (×4)"), one notification per list with a line for each thing (several from one person become one line: "Bia removed 3 items"). A server family gets them from the activity feed (`item_returned`, `item_changed` and `item_removed` are new); an offline family builds them from what the other phones sent, each list and item carrying the name of whoever last changed it (so a phone that hears of it through a third one still says whose doing it was).
+- **In the app**: with the app on screen, the same sentences come as a banner at the top (tap to open the list), except for the list being looked at. In Settings: phone notifications and banners can each be switched off, and so can each kind of thing (adding, the cart, buying, changes and removals).
+- **Closed**: a server family is checked every 15 minutes with the app closed, or at once when "Keep running in the background" is on. An offline family's engine lives in the process, not in the screen, and the foreground service keeps the process: swiping the app away leaves the connections to the family's phones, and the notifications about what they do, running. Opening the app shows it again. A phone that was restarted, or a process the phone stopped (battery optimisation, "sleeping apps"), needs the app opened once.
 

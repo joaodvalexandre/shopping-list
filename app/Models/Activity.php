@@ -14,6 +14,14 @@ class Activity extends Model
 
     public const ITEM_PURCHASED = 'item_purchased';
 
+    /** Taken out of the cart (or the purchases) and back to be bought. */
+    public const ITEM_RETURNED = 'item_returned';
+
+    public const ITEM_REMOVED = 'item_removed';
+
+    /** Renamed, or its quantity changed. */
+    public const ITEM_CHANGED = 'item_changed';
+
     public const LIST_CREATED = 'list_created';
 
     public $timestamps = false;

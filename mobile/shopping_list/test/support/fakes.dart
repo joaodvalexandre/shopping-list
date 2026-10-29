@@ -8,7 +8,7 @@ import 'package:shopping_list/state/notification_service.dart';
 
 /// A notification sink that remembers what it was asked to show.
 class FakeSink implements NoticeSink {
-  final shown = <({int id, String title, String body, String payload})>[];
+  final shown = <({int id, String title, String body, String payload, List<String> lines})>[];
   bool permission = true;
   int permissionAsks = 0;
 
@@ -19,8 +19,8 @@ class FakeSink implements NoticeSink {
   }
 
   @override
-  Future<void> show({required int id, required String title, required String body, required String payload}) async {
-    shown.add((id: id, title: title, body: body, payload: payload));
+  Future<void> show({required int id, required String title, required String body, required String payload, List<String> lines = const []}) async {
+    shown.add((id: id, title: title, body: body, payload: payload, lines: lines));
   }
 }
 

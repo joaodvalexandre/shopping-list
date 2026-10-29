@@ -60,9 +60,14 @@ class ShoppingListRecord {
     required this.listTypeId,
     this.hiddenFrom = const [],
     Pending? pending,
+    this.author,
   }) : pending = pending ?? Pending();
 
   final String uuid;
+
+  /// Who last changed it (a name), for a family that has no server to say: told with the change, so that a
+  /// phone that hears of it from a third one still knows whose doing it was.
+  String? author;
   String name;
   int nameChangedAt;
   final int listTypeId;
@@ -84,6 +89,7 @@ class ShoppingListRecord {
         'list_type_id': listTypeId,
         'hidden_from': jsonEncode(hiddenFrom),
         'pending': pending.encode(),
+        'author': author,
       };
 
   static ShoppingListRecord fromRow(Map<String, Object?> row) => ShoppingListRecord(
@@ -93,6 +99,7 @@ class ShoppingListRecord {
         listTypeId: row['list_type_id'] as int,
         hiddenFrom: (jsonDecode(row['hidden_from'] as String? ?? '[]') as List).map((e) => (e as num).toInt()).toList(),
         pending: Pending.decode(row['pending'] as String?),
+        author: row['author'] as String?,
       );
 }
 
@@ -107,7 +114,11 @@ class ItemRecord {
     required this.status,
     required this.statusChangedAt,
     Pending? pending,
+    this.author,
   }) : pending = pending ?? Pending();
+
+  /// Who last changed it (a name): see [ShoppingListRecord.author].
+  String? author;
 
   final String uuid;
   final String listUuid;
@@ -129,6 +140,7 @@ class ItemRecord {
         'status': status.code,
         'status_changed_at': statusChangedAt,
         'pending': pending.encode(),
+        'author': author,
       };
 
   static ItemRecord fromRow(Map<String, Object?> row) => ItemRecord(
@@ -141,6 +153,7 @@ class ItemRecord {
         status: ItemStatus.fromCode(row['status'] as String?),
         statusChangedAt: row['status_changed_at'] as int,
         pending: Pending.decode(row['pending'] as String?),
+        author: row['author'] as String?,
       );
 }
 

@@ -529,6 +529,71 @@ void main() {
     });
   });
 
+  group('what the others did', () {
+    test('is told as events, with who did it, even when it came through a third phone', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+      await meetLocal(bia, cai);
+
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      final milk = ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 2);
+      await meetLocal(ana, bia);
+
+      // Bia puts it in the cart; Cai only ever meets Bia, but is told it was Bia
+      bia.repo.setStatus(shop.uuid, milk.uuid, ItemStatus.inCart);
+      await meetLocal(bia, cai);
+
+      final (_, forCai) = await meetLocal(ana, cai); // (Cai hears the rest, from Ana)
+      final events = forCai.applied.events.map((e) => '${e.kind}:${e.actor}:${e.item ?? e.list}').toList();
+      expect(events, isNot(contains('item_in_cart:Ana:Milk')));
+
+      // what Cai took in from Bia carries Bia's name
+      expect(cai.repo.itemsOf(shop.uuid).single.author, 'Bia');
+    });
+
+    test('says moved, returned, changed and removed, each with the right name', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      final milk = ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 2);
+      final eggs = ana.repo.addItem(shop.uuid, name: 'Eggs', quantity: 6);
+      final rice = ana.repo.addItem(shop.uuid, name: 'Rice', quantity: 1);
+      await meetLocal(ana, bia);
+
+      ana.repo.setStatus(shop.uuid, milk.uuid, ItemStatus.inCart);
+      ana.repo.updateItem(shop.uuid, eggs.uuid, name: 'Eggs', quantity: 12);
+      ana.repo.deleteItem(shop.uuid, rice.uuid);
+      final (_, forBia) = await meetLocal(ana, bia);
+
+      final said = {for (final e in forBia.applied.events) e.kind: '${e.actor}|${e.item}|${e.quantity}|${e.list}'};
+      expect(said['item_in_cart'], 'Ana|Milk|2|Shop');
+      expect(said['item_changed'], 'Ana|Eggs|12|Shop');
+      expect(said['item_removed'], 'Ana|Rice|1|Shop');
+
+      ana.repo.setStatus(shop.uuid, milk.uuid, ItemStatus.toBuy);
+      final (_, back) = await meetLocal(ana, bia);
+      expect(back.applied.events.single.kind, 'item_returned');
+    });
+
+    test('a new list and a new item are told too, and nothing for what was already known', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 3);
+      final (_, first) = await meetLocal(ana, bia);
+
+      expect(first.applied.events.map((e) => e.kind), unorderedEquals(['list_created', 'item_added']));
+      expect(first.applied.events.every((e) => e.actor == 'Ana'), isTrue);
+
+      final (_, again) = await meetLocal(ana, bia);
+      expect(again.applied.events, isEmpty);
+    });
+  });
+
   group('roles', () {
     test('an admin makes someone an admin, and they can then set what the others may do', () async {
       final ana = await LocalPhone.start('Ana', familyName: 'Silva');
