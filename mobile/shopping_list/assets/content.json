@@ -1,5 +1,5 @@
 {
-    "version": "1e50b56af3a31dbf",
+    "version": "ffa3c2894033662c",
     "languages": [
         {
             "code": "pt",
@@ -319,6 +319,7 @@
             "app_nearby_searching": "a procurar telemóveis por perto",
             "app_nearby_connecting": "a ligar a :name",
             "app_nearby_syncing": "a sincronizar com :name",
+            "app_nearby_connected": "ligado a :name · última sincronização: :sent enviados, :received recebidos",
             "app_nearby_done": "sincronizado com :name: :sent enviadas, :received recebidas",
             "app_nearby_other_version": "um telemóvel por perto tem a versão :version: instala a mesma nos dois para sincronizar",
             "app_nearby_expired": "um telemóvel por perto tem de chegar ao servidor uma vez para ser de confiança",
@@ -649,6 +650,7 @@
             "app_nearby_connecting": "connecting to :name",
             "app_nearby_syncing": "syncing with :name",
             "app_nearby_done": "synced with :name: :sent sent, :received received",
+            "app_nearby_connected": "connected to :name · last sync: :sent sent, :received received",
             "app_nearby_other_version": "a phone nearby has version :version: install the same one on both to sync",
             "app_nearby_expired": "a phone nearby must reach the server once to be trusted",
             "app_nearby_last": "Last time: :text",

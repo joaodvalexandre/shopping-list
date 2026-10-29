@@ -9,22 +9,28 @@ import 'identity.dart';
 import 'radio.dart';
 import 'session.dart';
 
-enum NearbyState { off, searching, connecting, syncing }
+enum NearbyState { off, searching, connecting, syncing, connected }
 
-/// A phone seen nearby: its endpoint name says `version|device|person`.
+/// A phone seen nearby: its endpoint name says `version|device|family|person`.
 class NearbyPeer {
-  NearbyPeer({required this.endpointId, required this.version, required this.device, required this.person});
+  NearbyPeer({required this.endpointId, required this.version, required this.device, required this.person, this.family});
 
   final String endpointId;
   final String version;
   final String device;
   final String person;
 
+  /// A short tag of its family; null for a phone on an older version that did not say.
+  final String? family;
+
   static NearbyPeer? parse(String endpointId, String name) {
     final parts = name.split('|');
     if (parts.length < 3) return null;
 
-    return NearbyPeer(endpointId: endpointId, version: parts[0], device: parts[1], person: parts.sublist(2).join('|'));
+    if (parts.length == 3) {
+      return NearbyPeer(endpointId: endpointId, version: parts[0], device: parts[1], person: parts[2]);
+    }
+    return NearbyPeer(endpointId: endpointId, version: parts[0], device: parts[1], family: parts[2], person: parts.sublist(3).join('|'));
   }
 }
 
@@ -100,6 +106,7 @@ class NearbyService extends ChangeNotifier {
   final _failures = <String, int>{};
   final _retryNotBefore = <String, DateTime>{};
   Timer? _watchdog;
+  String? _familyTag;
 
   _Link? _link;
 
@@ -123,8 +130,8 @@ class NearbyService extends ChangeNotifier {
   /// Who this phone is talking to now.
   String? get currentPeer => _currentPeer;
 
-  /// The device name phones show each other: version, device and person.
-  String get endpointName => '$appVersion|$deviceId|${personName()}';
+  /// The device name phones show each other: version, device, family tag and person.
+  String get endpointName => '$appVersion|$deviceId|${_familyTag ?? ''}|${personName()}';
 
   Future<void> setEnabled(bool on) async {
     await prefs.setBool(enabledKey, on);
@@ -160,7 +167,12 @@ class NearbyService extends ChangeNotifier {
 
   /// Something changed here since the last meeting with a phone in sight: no need to wait for the next round.
   void _meetSoonIfChanged() {
-    if (_link != null) return;
+    final link = _link;
+    if (link != null) {
+      // Already connected to a phone: a new round over the same connection
+      if (_isIdle(link) && repository.pendingCount != _pendingAtMeeting[link.peer.device]) _runRound(link);
+      return;
+    }
 
     for (final peer in _seen.values) {
       final before = _pendingAtMeeting[peer.device];
@@ -187,6 +199,7 @@ class NearbyService extends ChangeNotifier {
         _set(NearbyState.off);
         return;
       }
+      _familyTag = await identity.familyTag();
 
       final started = await radio.start(name: endpointName, events: _events());
       _radioFailed = !started;
@@ -222,6 +235,8 @@ class NearbyService extends ChangeNotifier {
 
     final link = _link;
     _link = null;
+    link?.finished = true;
+    link?.nextRound?.cancel();
     link?.channel.close();
 
     await radio.stop();
@@ -250,6 +265,9 @@ class NearbyService extends ChangeNotifier {
       notifyListeners();
       return;
     }
+
+    // Another family: not even a connection (a stranger's phone must not keep ours busy)
+    if (peer.family != _familyTag) return;
 
     _seen[endpointId] = peer;
 
@@ -282,6 +300,12 @@ class NearbyService extends ChangeNotifier {
   }
 
   Future<void> _call(NearbyPeer peer) async {
+    // Connected to another phone and idle: it is this one's turn now
+    final standing = _link;
+    if (standing != null && _isIdle(standing) && standing.peer.device != peer.device && _seen.containsKey(peer.endpointId) && _due(peer)) {
+      _letGo(standing);
+    }
+
     final retryIn = _retryIn(peer);
 
     if (!_running || _link != null || !_seen.containsKey(peer.endpointId) || retryIn > Duration.zero || !_due(peer)) {
@@ -330,8 +354,13 @@ class NearbyService extends ChangeNotifier {
   void _onInitiated(String endpointId, String name) {
     final peer = NearbyPeer.parse(endpointId, name);
 
+    final standing = _link;
+    if (standing != null && peer != null && _isIdle(standing) && standing.endpointId != endpointId && peer.version == appVersion && peer.family == _familyTag) {
+      _letGo(standing); // connected to another phone and idle: this one is waiting
+    }
+
     // One at a time, and only phones on the same version
-    if (peer == null || peer.version != appVersion || (_link != null && _link!.endpointId != endpointId)) {
+    if (peer == null || peer.version != appVersion || peer.family != _familyTag || (_link != null && _link!.endpointId != endpointId)) {
       radio.reject(endpointId);
       return;
     }
@@ -354,12 +383,16 @@ class NearbyService extends ChangeNotifier {
       return;
     }
 
-    _runSession(link);
+    link.established = true;
+    _runRound(link);
   }
 
   void _onDisconnected(String endpointId) {
     final link = _link;
-    if (link != null && link.endpointId == endpointId) link.channel.close();
+    if (link == null || link.endpointId != endpointId) return;
+
+    link.channel.close(); // a round under way ends by itself, with what it had
+    if (!link.sessionActive) _finish(link, null, graceful: link.rounds > 0);
   }
 
   void _onReceived(String endpointId, Uint8List bytes) {
@@ -367,20 +400,35 @@ class NearbyService extends ChangeNotifier {
     if (link == null || link.endpointId != endpointId) return;
 
     final message = link.assembler.add(bytes);
-    if (message != null) link.channel.deliver(message);
+    if (message == null) return;
+
+    if (!link.sessionActive) {
+      // Between rounds only a new "hello" means something: the other phone has news
+      if (message['t'] != 'hello') return;
+      _runRound(link);
+    }
+    link.channel.deliver(message);
   }
 
-  Future<void> _runSession(_Link link) async {
+  bool _isIdle(_Link link) => link.established && !link.sessionActive && !link.finished;
+
+  /// One meeting over the connection: hello, proof, ready, offer, done. The connection is kept
+  /// afterwards, so the next round (when something changes, on either phone) needs no new connection.
+  Future<void> _runRound(_Link link) async {
+    if (link.sessionActive || link.finished || !_running) return;
+
+    link.sessionActive = true;
     _set(NearbyState.syncing);
 
     // Sending needs the radio: the channel hands whole messages to it
-    link.channel.sender = (frame) => radio.send(link.endpointId, frame);
+    final channel = link.channel = _RadioChannel(nextId: () => link.messageIds++)
+      ..sender = (frame) => radio.send(link.endpointId, frame);
 
     final session = PeerSession(
       identity: identity,
       repository: repository,
       appVersion: appVersion,
-      channel: link.channel,
+      channel: channel,
       displayName: personName(),
     );
 
@@ -391,24 +439,65 @@ class NearbyService extends ChangeNotifier {
       result = PeerResult(PeerStatus.protocol);
     }
 
+    link.sessionActive = false;
+    await channel.close();
+    if (link.finished) return;
+
+    if (result.status == PeerStatus.done) {
+      _roundDone(link, result);
+      return;
+    }
+
     await radio.disconnect(link.endpointId);
     _finish(link, result);
+  }
+
+  void _roundDone(_Link link, PeerResult result) {
+    link.rounds++;
+    _watchdog?.cancel();
+
+    final peer = link.peer;
+    _failures.remove(peer.device);
+    _retryNotBefore.remove(peer.device);
+    _lastMeeting[peer.device] = DateTime.now();
+    _pendingAtMeeting[peer.device] = repository.pendingCount;
+    _lastResult = result;
+    _lastMeetingAt = DateTime.now();
+
+    // Another phone of the family is waiting for its turn (one connection at a time): let go
+    if (_seen.values.any((other) => other.device != peer.device && _due(other))) {
+      _letGo(link);
+      return;
+    }
+
+    // Stay connected: a round when something changes here (or the other phone says so), and now and then anyway
+    link.nextRound?.cancel();
+    link.nextRound = Timer(meetAgainAfter, () => _runRound(link));
+    _currentPeer = peer.person;
+    _set(NearbyState.connected);
+  }
+
+  /// End a connection that worked, for another phone to have its turn.
+  void _letGo(_Link link) {
+    radio.disconnect(link.endpointId);
+    _finish(link, null, graceful: true);
   }
 
   /// A call that never became a meeting: worth trying again soon (the others, even a refusal, are not).
   static const _failed = {PeerStatus.protocol, PeerStatus.disconnected, PeerStatus.timeout};
 
-  void _finish(_Link link, PeerResult? result) {
+  void _finish(_Link link, PeerResult? result, {bool graceful = false}) {
     if (link.finished) return;
     link.finished = true;
 
     _watchdog?.cancel();
+    link.nextRound?.cancel();
     if (_link == link) _link = null;
     link.channel.close();
     _currentPeer = null;
 
     final peer = link.peer;
-    if (result == null || _failed.contains(result.status)) {
+    if (!graceful && (result == null || _failed.contains(result.status))) {
       final failures = _failures[peer.device] = (_failures[peer.device] ?? 0) + 1;
       final wait = retryAfter * (failures > 6 ? 6 : failures);
 
@@ -417,11 +506,13 @@ class NearbyService extends ChangeNotifier {
     } else {
       _failures.remove(peer.device);
       _retryNotBefore.remove(peer.device);
-      _lastMeeting[peer.device] = DateTime.now();
-      _pendingAtMeeting[peer.device] = repository.pendingCount;
+      if (result != null) {
+        _lastMeeting[peer.device] = DateTime.now();
+        _pendingAtMeeting[peer.device] = repository.pendingCount;
+      }
 
-      // the next round, with the caller going first
-      _scheduleCall(peer, shouldCall(deviceId, peer.device) ? meetAgainAfter : meetAgainAfter + callAfterWaiting);
+      // The connection is over (let go or lost): the next call is soon, to be connected again
+      _scheduleCall(peer, link.rounds > 0 ? retryAfter : (shouldCall(deviceId, peer.device) ? meetAgainAfter : meetAgainAfter + callAfterWaiting));
     }
 
     if (result != null) {
@@ -455,14 +546,23 @@ class _Link {
   final String endpointId;
   final NearbyPeer peer;
   final assembler = FrameAssembler();
-  final channel = _RadioChannel();
+  _RadioChannel channel = _RadioChannel(nextId: () => 0);
+  int messageIds = 0;
+  bool established = false;
+  bool sessionActive = false;
   bool finished = false;
+  int rounds = 0;
+  Timer? nextRound;
 }
 
 class _RadioChannel implements PeerChannel {
+  _RadioChannel({required this.nextId});
+
   final _incoming = StreamController<Map<String, dynamic>>();
   Future<void> Function(Uint8List frame)? sender;
-  int _messageId = 0;
+
+  /// Frames carry a message number that must not repeat on the connection, whichever round it is.
+  final int Function() nextId;
 
   @override
   Stream<Map<String, dynamic>> get messages => _incoming.stream;
@@ -476,7 +576,7 @@ class _RadioChannel implements PeerChannel {
     final send = sender;
     if (send == null) return;
 
-    for (final frame in Frames.split(message, _messageId++)) {
+    for (final frame in Frames.split(message, nextId())) {
       await send(frame);
     }
   }

@@ -321,6 +321,7 @@
     "app_nearby_connecting":    "connecting to :name",
     "app_nearby_syncing":       "syncing with :name",
     "app_nearby_done":          "synced with :name: :sent sent, :received received",
+    "app_nearby_connected":     "connected to :name · last sync: :sent sent, :received received",
     "app_nearby_other_version": "a phone nearby has version :version: install the same one on both to sync",
     "app_nearby_expired":       "a phone nearby must reach the server once to be trusted",
     "app_nearby_last":          "Last time: :text",

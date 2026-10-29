@@ -200,6 +200,11 @@ class SyncBanner extends StatelessWidget {
   return switch (nearby.state) {
     NearbyState.syncing => (context.t('app_nearby_syncing', {'name': who}), Icons.bluetooth_connected, Tw.blue500),
     NearbyState.connecting => (context.t('app_nearby_connecting', {'name': who}), Icons.bluetooth_searching, Tw.blue500),
+    NearbyState.connected => (
+        context.t('app_nearby_connected', {'name': who, 'sent': last?.sent ?? 0, 'received': last?.applied.total ?? 0}),
+        Icons.bluetooth_connected,
+        Tw.green600,
+      ),
     _ when recent && last != null && last.ok => (
         context.t('app_nearby_done', {'name': last.peerName ?? '', 'sent': last.sent, 'received': last.applied.total}),
         Icons.bluetooth_connected,

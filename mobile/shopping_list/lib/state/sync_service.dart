@@ -72,7 +72,10 @@ class SyncService extends ChangeNotifier {
   }
 
   void start() {
-    _periodic ??= Timer.periodic(const Duration(seconds: 30), (_) => sync());
+    // While the server is known to be down the watcher tries it every few seconds, so no need to pile on
+    _periodic ??= Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!(_unreachable && _watcher != null)) sync();
+    });
     _connectivity ??= (connectivityChanges ?? Connectivity().onConnectivityChanged).listen((results) {
       if (results.any((result) => result != ConnectivityResult.none)) sync();
     });
@@ -102,18 +105,30 @@ class SyncService extends ChangeNotifier {
 
   /// The "watcher": a tiny request for a marker of what changed. Another phone or the web
   /// changing something makes the marker differ, and the phone syncs at once instead of at the next round.
+  ///
+  /// It is also how the phone learns, within seconds, that the server has gone (then it looks for phones
+  /// nearby instead) and that it is back (then everything is sent and brought up to date).
   Future<void> _watch() async {
-    if (_watching || _running || _unreachable || auth.status != AuthStatus.signedIn) return;
+    if (_watching || _running || auth.status != AuthStatus.signedIn) return;
 
     _watching = true;
     try {
       final marker = await api.watch();
+      final wasDown = _unreachable;
       final changed = _marker != null && marker != _marker;
       _marker = marker;
 
-      if (changed) await sync();
+      if (wasDown || changed) await sync();
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        await sync(); // the ordinary sync deals with a token that is no longer good
+      } else if (e.isServerDown && !_unreachable) {
+        _lastError = e.message;
+        _unreachable = true;
+        _set(SyncStatus.offline);
+      }
     } catch (_) {
-      // offline or a hiccup: the ordinary sync keeps its own rounds and does the reporting
+      // a hiccup: the ordinary sync keeps its own rounds and does the reporting
     } finally {
       _watching = false;
     }
@@ -132,6 +147,8 @@ class SyncService extends ChangeNotifier {
   /// After an edit: wait a moment, so several quick edits go in one round trip.
   void requestSoon() {
     if (auth.status != AuthStatus.signedIn) return;
+    // With the server down the change waits (phones nearby may take it); the watcher syncs when it is back
+    if (_unreachable && _watcher != null) return;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 700), sync);
   }
@@ -165,8 +182,8 @@ class SyncService extends ChangeNotifier {
       } else {
         debugPrint('sync failed: ${e.status} ${e.message}');
         _lastError = e.message;
-        _unreachable = e.isOffline;
-        _set(e.isOffline ? SyncStatus.offline : SyncStatus.error);
+        _unreachable = e.isServerDown;
+        _set(e.isServerDown ? SyncStatus.offline : SyncStatus.error);
       }
     } catch (e, stack) {
       debugPrint('sync failed: $e\n$stack');

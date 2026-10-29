@@ -17,6 +17,10 @@ class ApiException implements Exception {
   final Map<String, List<String>> errors;
 
   bool get isOffline => status == 0;
+
+  /// Nobody to talk to, whether the network is down or the server is (no answer, or an error of its own).
+  /// Then the phone looks for phones nearby instead.
+  bool get isServerDown => status == 0 || status >= 500;
   bool get isUnauthorized => status == 401;
   bool get isForbidden => status == 403;
   bool get isValidation => status == 422;
@@ -74,14 +78,14 @@ class ApiClient {
         'Accept-Language': ?language,
       };
 
-  Future<Map<String, dynamic>> _send(String method, String path, {Object? body}) async {
+  Future<Map<String, dynamic>> _send(String method, String path, {Object? body, Duration timeout = _timeout}) async {
     final request = http.Request(method, _uri(path))
       ..headers.addAll(_headers)
       ..body = body == null ? '' : jsonEncode(body);
 
     http.Response response;
     try {
-      response = await http.Response.fromStream(await _client.send(request).timeout(_timeout));
+      response = await http.Response.fromStream(await _client.send(request).timeout(timeout));
     } on TimeoutException {
       throw ApiException(0, 'timeout');
     } on SocketException catch (e) {
@@ -195,7 +199,7 @@ class ApiClient {
 
   /// A marker of what this person may see: when it differs from the last one, something changed
   /// (on the web or on another phone) and a sync is worth running. Cheap enough to ask every few seconds.
-  Future<String> watch() async => (await _send('GET', '/watch'))['version'] as String;
+  Future<String> watch() async => (await _send('GET', '/watch', timeout: const Duration(seconds: 5)))['version'] as String;
 
   void close() => _client.close();
 }

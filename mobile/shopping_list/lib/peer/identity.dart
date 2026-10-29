@@ -119,6 +119,17 @@ class PeerIdentity {
     return (stored.claims['exp'] as num).toInt() > _clock() ? stored : null;
   }
 
+  /// A short tag of this phone's family, shown in the name the phone advertises so that phones of
+  /// other families are not even connected to. Not a secret (anyone can tell who is in the same
+  /// group) and not a proof: the signed credential still decides who is trusted.
+  Future<String?> familyTag() async {
+    final mine = await credential();
+    if (mine == null) return null;
+
+    final digest = await Sha256().hash(utf8.encode('cestou-family|${mine.serverKey}|${mine.claims['family_id']}'));
+    return digest.bytes.take(4).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
   /// Ask the server for a fresh credential (when it is missing, expiring or stale). Quiet
   /// when the server cannot be reached: the one held, if any, stays in use.
   Future<void> refresh(ApiClient api, {bool force = false}) async {

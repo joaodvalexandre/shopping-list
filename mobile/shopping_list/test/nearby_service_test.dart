@@ -30,6 +30,7 @@ class FakeRadio implements NearbyRadio {
   /// Calls to this phone vanish in the air: neither a connection nor an error comes back.
   bool stalls = false;
   int starts = 0;
+  final calledTo = <String>[];
   final accepted = <String>{};
 
   void _later(void Function() action) => Future<void>.delayed(Duration.zero, action);
@@ -60,6 +61,7 @@ class FakeRadio implements NearbyRadio {
 
   @override
   Future<void> connect(String endpointId, {required String name}) async {
+    calledTo.add(endpointId);
     final other = air.byId(endpointId);
     if (other == null || !other.started || stalls) return;
 
@@ -144,8 +146,9 @@ void main() {
     Future<bool> Function()? permissions,
     Duration meetAgainAfter = const Duration(hours: 1),
     Duration linkTimeout = const Duration(seconds: 45),
+    int familyId = 1,
   }) async {
-    final phone = await makePhone(userId: userId, name: name, version: version, lists: shopping, items: basics);
+    final phone = await makePhone(userId: userId, name: name, version: version, familyId: familyId, lists: shopping, items: basics);
     final radio = FakeRadio(air, 'ep-$device');
     final trigger = Trigger();
 
@@ -189,8 +192,10 @@ void main() {
     expect(ana.phone.item('L1', 'I1').status, ItemStatus.inCart);
     expect(rui.phone.repo.itemsOf('L1').map((i) => i.name), contains('Sausages'));
 
-    await until(() => ana.service.state == NearbyState.searching && rui.service.state == NearbyState.searching);
-    expect(ana.service.currentPeer, isNull);
+    // and they stay connected, for the next time something changes
+    await until(() => ana.service.state == NearbyState.connected && rui.service.state == NearbyState.connected);
+    expect(ana.service.currentPeer, 'Rui');
+    expect(rui.service.currentPeer, 'Ana');
   });
 
   test('they meet again when something changed here, and not before', () async {
@@ -221,12 +226,34 @@ void main() {
     rui.service.setForeground(true);
 
     await until(() => ana.service.lastResult != null && rui.service.lastResult != null);
-    await until(() => ana.service.state == NearbyState.searching);
+    await until(() => ana.service.state == NearbyState.connected);
+    final connections = ana.radio.calledTo.length + rui.radio.calledTo.length;
 
     ana.phone.repo.addItem('L1', name: 'Ribs', quantity: 2);
     ana.trigger.fire();
-
     await until(() => rui.phone.repo.itemsOf('L1').any((i) => i.name == 'Ribs'));
+
+    // and the other way round, with no new connection for either
+    rui.phone.repo.addItem('L1', name: 'Wine', quantity: 1);
+    rui.trigger.fire();
+    await until(() => ana.phone.repo.itemsOf('L1').any((i) => i.name == 'Wine'));
+
+    expect(ana.radio.calledTo.length + rui.radio.calledTo.length, connections);
+  });
+
+  test('connected phones let go when another phone of the family needs its turn, and meet again later', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana');
+    final rui = await phoneWithService('bbbb', 3, 'Rui');
+    ana.service.setForeground(true);
+    rui.service.setForeground(true);
+    await until(() => ana.service.state == NearbyState.connected && rui.service.state == NearbyState.connected);
+
+    // a third phone turns up
+    final bia = await phoneWithService('cccc', 4, 'Bia');
+    bia.service.setForeground(true);
+
+    await until(() => bia.service.lastResult?.ok == true);
+    expect(bia.service.lastResult!.ok, isTrue);
   });
 
   test('a call that never gets an answer is dropped and tried again, and then works', () async {
@@ -246,6 +273,32 @@ void main() {
     rui.radio.stalls = false;
 
     await until(() => ana.service.lastResult?.ok == true && rui.service.lastResult?.ok == true);
+  });
+
+  test('a phone of another family is not even connected to, while family phones still meet', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana');
+    final stranger = await phoneWithService('bbbb', 7, 'Marta', familyId: 2);
+    final rui = await phoneWithService('cccc', 3, 'Rui');
+
+    ana.phone.repo.addItem('L1', name: 'Sausages', quantity: 4);
+    stranger.phone.repo.addItem('L1', name: 'Secret', quantity: 1);
+
+    for (final phone in [ana, stranger, rui]) {
+      phone.service.setForeground(true);
+    }
+
+    await until(() => rui.phone.repo.itemsOf('L1').any((i) => i.name == 'Sausages'));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    // nobody called the stranger, and the stranger called nobody
+    expect(ana.radio.calledTo, isNot(contains('ep-bbbb')));
+    expect(rui.radio.calledTo, isNot(contains('ep-bbbb')));
+    expect(stranger.radio.calledTo, isEmpty);
+    expect(stranger.service.lastResult, isNull);
+
+    // and nothing was exchanged with them
+    expect(ana.phone.repo.itemsOf('L1').map((i) => i.name), isNot(contains('Secret')));
+    expect(stranger.phone.repo.itemsOf('L1').map((i) => i.name), isNot(contains('Sausages')));
   });
 
   test('a phone on another version is never connected to, and the person is told', () async {

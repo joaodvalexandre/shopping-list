@@ -320,6 +320,7 @@
     "app_nearby_searching":     "a procurar telemóveis por perto",
     "app_nearby_connecting":    "a ligar a :name",
     "app_nearby_syncing":       "a sincronizar com :name",
+    "app_nearby_connected":     "ligado a :name · última sincronização: :sent enviados, :received recebidos",
     "app_nearby_done":          "sincronizado com :name: :sent enviadas, :received recebidas",
     "app_nearby_other_version": "um telemóvel por perto tem a versão :version: instala a mesma nos dois para sincronizar",
     "app_nearby_expired":       "um telemóvel por perto tem de chegar ao servidor uma vez para ser de confiança",
