@@ -10,7 +10,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ __(explode('.', Route::currentRouteName())[0]); }}</title>
+        <title>{{ $attributes->get('heading') ?? __(explode('.', Route::currentRouteName())[0]) }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -31,7 +31,7 @@
             <!-- Page Heading -->
             <header class="bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white">
                 <div class="max-w-7xl mx-auto py-4 px-6">
-                    {{ __($route) }}
+                    {{ $attributes->get('heading') ?? __($route) }}
                 </div>
             </header>
 

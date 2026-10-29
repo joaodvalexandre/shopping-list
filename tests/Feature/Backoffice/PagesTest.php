@@ -156,5 +156,23 @@ it('puts a back link at the top of a page: to the login for guests, to the dashb
 
     $f = makeFamily();
     $this->actingAs($f['admin'])->withSession(['locale' => 'en'])->get('/p/about')
-        ->assertOk()->assertSee('Back to dashboard')->assertDontSee('Back to log in');
+        ->assertOk()->assertDontSee('Back to dashboard')->assertDontSee('Back to log in');
+});
+
+it('shows a page inside the app (navbar, header and middle block) when signed in, and on its own when not', function () {
+    publishedPage(['slug' => 'privacy', 'title' => ['pt' => 'Privacidade', 'en' => 'Privacy']]);
+
+    $guest = $this->withSession(['locale' => 'en'])->get('/p/privacy')->assertOk();
+    $guest->assertSee('sm:max-w-3xl', false)        // the guest layout's own card
+        ->assertSee('<h1', false);
+
+    $f = makeFamily();
+    $member = $this->actingAs($f['admin'])->withSession(['locale' => 'en'])->get('/p/privacy')->assertOk();
+
+    $member->assertDontSee('sm:max-w-3xl', false)   // not the login-style card
+        ->assertSee('bg-white dark:bg-gray-800 shadow-xs', false)   // the app's middle block
+        ->assertSee(route('dashboard'), false)       // the navbar
+        ->assertSee('<title>Privacy</title>', false)
+        ->assertSee('English text');
+    expect(substr_count($member->getContent(), 'Privacy'))->toBeGreaterThanOrEqual(2);   // tab title and the header strip
 });
