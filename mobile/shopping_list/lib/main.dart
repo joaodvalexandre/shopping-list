@@ -226,7 +226,15 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
       _startNotifications();
     } else {
       sync.stop();
-      if (status == AuthStatus.signedOut) cancelBackgroundChecks();
+      if (status == AuthStatus.signedOut) {
+        cancelBackgroundChecks();
+
+        // Whatever was open on top (Settings, a list...) belongs to the person who has just gone: back to the sign-in
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          InAppBanner.dismiss();
+          navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        });
+      }
     }
 
     // Signing in or out can change which links and texts apply
