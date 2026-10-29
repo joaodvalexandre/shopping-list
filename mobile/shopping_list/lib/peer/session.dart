@@ -285,7 +285,8 @@ class LocalPeerSession {
 
     try {
       final known = knownPeer;
-      return known != null ? await _exchange(inbox, known.name, known.id) : await _meet(inbox);
+      // (a connection already proven: the person it was proven to be is still the one)
+      return known != null ? await _exchange(inbox, known.name, known.id, authenticated: known.id != null && repository.localSigner != null) : await _meet(inbox);
     } on _Bye catch (bye) {
       return PeerResult(PeerSession._statusOf(bye.reason), theirVersion: bye.detail);
     } on TimeoutException {
@@ -311,6 +312,7 @@ class LocalPeerSession {
       'version': appVersion,
       'name': displayName,
       'member': repository.localMyId,
+      'key': await repository.localSigner?.publicKey(),
       'nonce': myNonce,
     });
 
@@ -328,8 +330,14 @@ class LocalPeerSession {
 
     final theirNonce = hello['nonce'] as String? ?? '';
 
-    // 2. proof: each answers the other's challenge, which only the code makes possible
-    await channel.send({'t': 'proof', 'mac': await key.prove('$theirNonce|$myNonce')});
+    // 2. proof: each answers the other's challenge, which only the code makes possible, and shows
+    //    it holds the key of the person it says it is
+    final signer = repository.localSigner;
+    await channel.send({
+      't': 'proof',
+      'mac': await key.prove('$theirNonce|$myNonce'),
+      if (signer != null) 'sig': await signer.sign(LocalFamilyCrypto.memberChallenge(theirNonce, myNonce)),
+    });
 
     final theirProof = await inbox.receive('proof', timeout);
     if (theirProof['mac'] != await key.prove('$myNonce|$theirNonce')) {
@@ -337,22 +345,46 @@ class LocalPeerSession {
       return PeerResult(PeerStatus.invalidCredential);
     }
 
-    return _exchange(inbox, hello['name']?.toString() ?? '', hello['member']?.toString());
+    final theirId = hello['member']?.toString();
+    final theirKey = hello['key']?.toString();
+    var authenticated = false;
+
+    if (signer != null) {
+      // Who they say they are: the key must be the one the family knows them by, and be theirs
+      final known = theirId == null ? null : repository.localMemberKey(theirId);
+      final signature = theirProof['sig']?.toString();
+      final genuine = theirId != null &&
+          theirKey != null &&
+          signature != null &&
+          (known == null || known == theirKey) &&
+          await LocalFamilyCrypto.verify(theirKey, LocalFamilyCrypto.memberChallenge(myNonce, theirNonce), signature);
+
+      if (!genuine) {
+        await _bye('badProof');
+        return PeerResult(PeerStatus.invalidCredential);
+      }
+      authenticated = true;
+    }
+
+    return _exchange(inbox, hello['name']?.toString() ?? '', theirId, authenticated: authenticated);
   }
 
-  /// ready, offer, done: compare what each holds, and swap what the other lacks.
-  Future<PeerResult> _exchange(_Inbox inbox, String peerName, String? peerId) async {
+  /// ready, offer, done: compare what each holds, and swap what the other lacks. With an
+  /// [authenticated] person the family's rules apply to them: what they may see, what they may change.
+  Future<PeerResult> _exchange(_Inbox inbox, String peerName, String? peerId, {bool authenticated = false}) async {
+    final rightsOf = authenticated ? peerId : null;
+
     // 3. ready: what each holds, in a few numbers
     await channel.send({'t': 'ready', 'digest': repository.buildLocalDigest()});
     final ready = await inbox.receive('ready', timeout);
 
     // 4. offer: only what the other lacks or has older
-    final offer = repository.buildLocalDelta(asMap(ready['digest']));
+    final offer = repository.buildLocalDelta(asMap(ready['digest']), peerId: rightsOf);
     await channel.send({'t': 'offer', ...offer});
     final sent = (offer['lists'] as List).length + (offer['items'] as List).length + (offer['gone'] as List).length;
 
     final theirOffer = await inbox.receive('offer', timeout);
-    final applied = await repository.applyLocalDelta(theirOffer);
+    final applied = await repository.applyLocalDelta(theirOffer, peerId: rightsOf);
 
     if (peerId != null) repository.noteSeen(peerId);
 

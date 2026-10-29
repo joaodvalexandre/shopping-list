@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shopping_list/data/me.dart';
+import 'package:shopping_list/peer/identity.dart';
 import 'package:shopping_list/data/models.dart';
 import 'package:shopping_list/data/repository.dart';
 import 'package:shopping_list/peer/local_family.dart';
 import 'package:shopping_list/peer/session.dart';
 
+import 'support/fakes.dart';
 import 'support/memory_store.dart';
 import 'support/peer_support.dart';
 
@@ -18,12 +21,13 @@ class LocalPhone {
   final LocalFamily family;
   final LocalFamilyKey key;
 
-  static Future<LocalPhone> start(String name, {String? code, String familyName = ''}) async {
+  static Future<LocalPhone> start(String name, {String? code, String familyName = '', String? memberId}) async {
     final store = MemoryStore();
     final repo = Repository(store);
     final keyStore = LocalFamilyStore(store);
 
-    final memberId = LocalFamilyStore.newMemberId();
+    await repo.attachSigner(localSignerFor(PeerIdentity(secrets: MemorySecrets(), store: store)));
+    memberId ??= LocalFamilyStore.newMemberId();
     await repo.startLocal(myName: name, familyName: familyName, memberId: memberId, creating: code == null);
     final family = code == null
         ? await keyStore.create(myName: name, familyName: familyName, memberId: memberId)
@@ -328,6 +332,283 @@ void main() {
       expect(results.every((r) => r.ok), isTrue);
       expect(bia.items('Shop'), ['Milk']);
       expect(results[1].applied.added, ['Milk']);
+    });
+  });
+
+  group('who may do what', () {
+    Map<int, Map<Ability, bool>> only(Set<Ability> abilities) => {
+          Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view ? abilities.isNotEmpty : abilities.contains(a)},
+        };
+
+    Future<(LocalPhone, LocalPhone, String)> twoPhonesWithAList() async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 2);
+      await meetLocal(ana, bia);
+      return (ana, bia, shop.uuid);
+    }
+
+    test('the person who started the family is its admin, and the others learn it', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+
+      expect(ana.repo.isLocalAdmin, isTrue);
+      expect(bia.repo.isLocalAdmin, isFalse);
+      expect(ana.repo.me!.isAdmin, isTrue);
+
+      await meetLocal(ana, bia);
+
+      expect(bia.repo.localMembers.firstWhere((m) => m.name == 'Ana').founder, isTrue);
+      expect(bia.repo.localMembers.firstWhere((m) => m.name == 'Bia').founder, isFalse);
+    });
+
+    test('everyone may do everything until the admin says otherwise', () async {
+      final (ana, bia, _) = await twoPhonesWithAList();
+      final typeId = Repository.localTypeId;
+
+      for (final ability in Ability.values) {
+        expect(bia.repo.me!.can(typeId, ability), isTrue, reason: ability.name);
+      }
+      expect(ana.repo.me!.canCreateLists, isTrue);
+    });
+
+    test('the admin sets what a person may do, and that person\'s phone learns it', () async {
+      final (ana, bia, _) = await twoPhonesWithAList();
+      final biaId = bia.repo.localMyId;
+
+      expect(await ana.repo.setLocalRights(biaId, only({Ability.view, Ability.addItems})), isTrue);
+      await meetLocal(ana, bia);
+
+      final me = bia.repo.me!;
+      expect(me.can(Repository.localTypeId, Ability.view), isTrue);
+      expect(me.can(Repository.localTypeId, Ability.addItems), isTrue);
+      expect(me.can(Repository.localTypeId, Ability.editItems), isFalse);
+      expect(me.can(Repository.localTypeId, Ability.manageLists), isFalse);
+      expect(bia.repo.localRightsOf(biaId)[Repository.localTypeId]![Ability.changeStatus], isFalse);
+    });
+
+    test('only the admin can set rights', () async {
+      final (ana, bia, _) = await twoPhonesWithAList();
+
+      expect(await bia.repo.setLocalRights(ana.repo.localMyId, only({})), isFalse);
+      expect(await bia.repo.setLocalRights(bia.repo.localMyId, only(Ability.values.toSet())), isFalse);
+      expect(await ana.repo.setLocalRights(ana.repo.localMyId, only({})), isFalse); // nor the admin's own
+    });
+
+    test('a change by someone without the right is not taken in, and the right ones are', () async {
+      final (ana, bia, listUuid) = await twoPhonesWithAList();
+      await ana.repo.setLocalRights(bia.repo.localMyId, only({Ability.view, Ability.addItems})); // may add, not edit
+      await meetLocal(ana, bia);
+
+      final milk = bia.repo.itemsOf(listUuid).single;
+      bia.repo.addItem(listUuid, name: 'Bread', quantity: 1); // allowed
+      bia.repo.updateItem(listUuid, milk.uuid, name: 'Milk', quantity: 50); // not allowed
+      bia.repo.setStatus(listUuid, milk.uuid, ItemStatus.inCart); // not allowed
+      bia.repo.createList(name: 'Sneaky', listTypeId: Repository.localTypeId); // not allowed
+
+      await meetLocal(ana, bia);
+
+      expect(ana.items('Shop'), ['Bread', 'Milk']);
+      final theirMilk = ana.repo.itemsOf(listUuid).firstWhere((i) => i.name == 'Milk');
+      expect(theirMilk.quantity, 2);
+      expect(theirMilk.status, ItemStatus.toBuy);
+      expect(ana.repo.lists.map((l) => l.name), ['Shop']);
+    });
+
+    test('an item added by someone who may not use the cart arrives as to buy', () async {
+      final (ana, bia, listUuid) = await twoPhonesWithAList();
+      await ana.repo.setLocalRights(bia.repo.localMyId, only({Ability.view, Ability.addItems}));
+      await meetLocal(ana, bia);
+
+      final item = bia.repo.addItem(listUuid, name: 'Cheat', quantity: 1);
+      bia.repo.setStatus(listUuid, item.uuid, ItemStatus.purchased);
+      await meetLocal(ana, bia);
+
+      expect(ana.repo.itemsOf(listUuid).firstWhere((i) => i.name == 'Cheat').status, ItemStatus.toBuy);
+    });
+
+    test('someone who may only look can still receive everything', () async {
+      final (ana, bia, listUuid) = await twoPhonesWithAList();
+      await ana.repo.setLocalRights(bia.repo.localMyId, only({Ability.view}));
+      await meetLocal(ana, bia);
+
+      ana.repo.addItem(listUuid, name: 'Eggs', quantity: 6);
+      await meetLocal(ana, bia);
+
+      expect(bia.items('Shop'), ['Eggs', 'Milk']);
+    });
+
+    test('someone may not give themselves more rights: only the admin\'s signature counts', () async {
+      final (ana, bia, _) = await twoPhonesWithAList();
+      final biaId = bia.repo.localMyId;
+      await ana.repo.setLocalRights(biaId, only({Ability.view}));
+      await meetLocal(ana, bia);
+
+      // Bia writes herself a record with all the rights, signed with her own key
+      const at = 9999999999999;
+      final message = 'perm|$biaId|$at|${Repository.localTypeId}:can_add_items,can_change_status,can_edit_items,can_manage_lists,can_view';
+      final forged = {
+        'lists': const [],
+        'items': const [],
+        'types': const [],
+        'gone': const [],
+        'members': [
+          {
+            'id': biaId,
+            'number': 1,
+            'name': 'Bia',
+            'at': 1,
+            'joined': 1,
+            'perm': {
+              'at': at,
+              'rights': {'${Repository.localTypeId}': ['can_view', 'can_add_items', 'can_edit_items', 'can_change_status', 'can_manage_lists']},
+              'sig': await bia.repo.localSigner!.sign(message),
+            },
+          },
+        ],
+      };
+
+      await ana.repo.applyLocalDelta(forged);
+      expect(ana.repo.localRightsOf(biaId)[Repository.localTypeId]![Ability.editItems], isFalse);
+    });
+
+    test('a list hidden from someone is never sent to them, and goes from them when hidden later', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia);
+      final biaNumber = ana.repo.localMembers.firstWhere((m) => m.name == 'Bia').number;
+
+      ana.repo.createList(name: 'Birthday', listTypeId: Repository.localTypeId, hiddenFrom: [biaNumber]);
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 1);
+      await meetLocal(ana, bia);
+
+      expect(bia.repo.lists.map((l) => l.name), ['Shop']);
+
+      // hidden afterwards: the phone drops it
+      ana.repo.updateList(shop.uuid, name: 'Shop', hiddenFrom: [biaNumber]);
+      await meetLocal(ana, bia);
+
+      expect(bia.repo.lists, isEmpty);
+      expect(ana.repo.lists.map((l) => l.name), ['Birthday', 'Shop']);
+    });
+
+    test('lists of a type someone may not see are not sent to them', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final party = ana.repo.addLocalType('Party');
+      await meetLocal(ana, bia);
+
+      await ana.repo.setLocalRights(bia.repo.localMyId, {
+        Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view},
+        party: {for (final a in Ability.values) a: false},
+      });
+      ana.repo.createList(name: 'Birthday', listTypeId: party);
+      ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      await meetLocal(ana, bia);
+
+      expect(bia.repo.lists.map((l) => l.name), ['Shop']);
+    });
+
+    test('a phone that claims to be someone else, with another key, is turned away', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia); // Ana now knows Bia by her key
+
+      // somebody with the code, and Bia's id, but not her key
+      final impostor = await LocalPhone.start('Not Bia', code: ana.family.code, memberId: bia.repo.localMyId);
+      final (forAna, forImpostor) = await meetLocal(ana, impostor);
+
+      expect(forAna.ok, isFalse);
+      expect(forImpostor.ok, isFalse);
+      expect(forAna.status, PeerStatus.invalidCredential);
+    });
+  });
+
+  group('leaving the family', () {
+    Future<void> later() => Future<void>.delayed(const Duration(milliseconds: 3));
+
+    test('someone who leaves is struck off the others\' lists', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+      await meetLocal(bia, cai);
+
+      expect(await bia.repo.prepareLeaving(), isTrue);
+      await meetLocal(bia, ana); // she tells the one phone near her, and goes
+      await meetLocal(ana, cai); // and it passes on
+
+      expect(ana.repo.localMembers.map((m) => m.name), ['Ana', 'Cai']);
+      expect(cai.repo.localMembers.map((m) => m.name), ['Cai', 'Ana']);
+    });
+
+    test('the admin who leaves hands the family to the oldest member, who is believed by everyone', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      await later();
+      final bia = await LocalPhone.start('Bia', code: ana.family.code); // the oldest after Ana
+      await later();
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+      await meetLocal(bia, cai);
+
+      expect(ana.repo.localHeir!.name, 'Bia');
+      await ana.repo.setLocalRights(cai.repo.localMyId, {
+        Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view},
+      });
+      await meetLocal(ana, cai);
+      await meetLocal(ana, bia);
+
+      expect(await ana.repo.prepareLeaving(), isTrue);
+      await meetLocal(ana, cai); // the only phone Ana meets before she goes is Cai's
+      await meetLocal(cai, bia); // and Cai tells Bia
+
+      expect(bia.repo.isLocalAdmin, isTrue);
+      expect(bia.repo.me!.isAdmin, isTrue);
+      expect(cai.repo.isLocalAdmin, isFalse);
+      expect(cai.repo.localMembers.firstWhere((m) => m.name == 'Bia').founder, isTrue);
+      expect(cai.repo.localMembers.map((m) => m.name), isNot(contains('Ana')));
+      expect(bia.repo.localMembers.map((m) => m.name), isNot(contains('Ana')));
+      expect(bia.repo.localMembers.every((m) => m.founder == (m.name == 'Bia')), isTrue);
+
+      // the new admin's word is the one that counts now
+      expect(await bia.repo.setLocalRights(cai.repo.localMyId, {
+        Repository.localTypeId: {for (final a in Ability.values) a: true},
+      }), isTrue);
+      await meetLocal(bia, cai);
+      expect(cai.repo.me!.can(Repository.localTypeId, Ability.editItems), isTrue);
+
+      // what Ana had set for people was signed again by the new admin, so a phone that only ever meets the new admin believes it
+      final dan = await LocalPhone.start('Dan', code: ana.family.code);
+      await ana.repo.setLocalRights(bia.repo.localMyId, {}); // (a leftover of the old admin must not matter)
+      await meetLocal(bia, dan);
+      expect(dan.repo.localMembers.firstWhere((m) => m.name == 'Bia').founder, isTrue);
+    });
+
+    test('the admin who is alone just leaves, and nobody else can take the family over from a forged hand-over', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      expect(await ana.repo.prepareLeaving(), isTrue);
+
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+
+      // Cai writes himself a hand-over, signed with his own key
+      final signature = await cai.repo.localSigner!.sign('owner|${cai.repo.localMyId}|99999999999999');
+      await bia.repo.applyLocalDelta({
+        'lists': const [],
+        'items': const [],
+        'types': const [],
+        'members': const [],
+        'gone': const [],
+        'owner': {'to': cai.repo.localMyId, 'at': 99999999999999, 'sig': signature},
+      });
+
+      expect(bia.repo.localMembers.where((m) => m.name == 'Cai').every((m) => !m.founder), isTrue);
     });
   });
 

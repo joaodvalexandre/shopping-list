@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -11,154 +10,113 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/family_dialogs.dart';
 import '../widgets/top_bar.dart';
+import 'local_member_screen.dart';
+import 'offline_start_screen.dart';
 
-/// The management page of a local family: that this phone is in it, who else is, how the link
-/// with them is, the code and QR code to bring more phones in, and the list types.
-class LocalFamilyScreen extends StatelessWidget {
+/// The management page of an offline family. It looks like a server family's (the same two pills
+/// for people and list types, the same cards), with what only an offline family has on top: that
+/// this phone is in the family, and how the link with the others is.
+class LocalFamilyScreen extends StatefulWidget {
   const LocalFamilyScreen({super.key});
+
+  @override
+  State<LocalFamilyScreen> createState() => _LocalFamilyScreenState();
+}
+
+class _LocalFamilyScreenState extends State<LocalFamilyScreen> {
+  bool _showTypes = false;
 
   @override
   Widget build(BuildContext context) {
     final repository = context.watch<Repository>();
     final nearby = context.watch<NearbyService>();
     final family = context.read<AuthState>().localFamily?.currentSync;
-    final muted = context.isDark ? Tw.gray400 : Tw.gray500;
+    final dark = context.isDark;
+    final muted = dark ? Tw.gray400 : Tw.gray500;
     final me = repository.me;
+    final admin = repository.isLocalAdmin;
 
     final (String linkText, IconData linkIcon, Color linkColor) = localLinkLine(context, nearby);
 
     return ListView(
       padding: scrollPadding,
       children: [
-        // Am I in the family?
+        // That this phone is in the family, and how the link is
         Panel(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                Icon(Icons.check_circle, color: context.isDark ? Tw.green500 : Tw.green600),
+                Icon(Icons.check_circle, size: 18, color: dark ? Tw.green500 : Tw.green600),
                 const SizedBox(width: 8),
                 Expanded(child: Text(context.t('app_family_you_in'), style: TextStyle(fontSize: 13, color: muted))),
               ]),
-              const SizedBox(height: 4),
               Row(children: [
                 Expanded(
                   child: Text(
                     (me?.familyName ?? '').isEmpty ? context.t('app_offline_family_unknown') : me!.familyName,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
-                IconButton(
-                  tooltip: context.t('app_family_rename'),
-                  icon: Icon(Icons.edit_outlined, color: context.isDark ? Tw.amber400 : Tw.amber600),
-                  onPressed: () => askListTypeName(
-                    context,
-                    title: context.rt('app_family_name_title'),
-                    initial: me?.familyName ?? '',
-                    save: (name) async => repository.renameFamily(name),
+                if (admin)
+                  IconButton(
+                    tooltip: context.t('app_family_rename'),
+                    icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
+                    onPressed: () => askListTypeName(
+                      context,
+                      title: context.rt('app_family_name_title'),
+                      initial: me?.familyName ?? '',
+                      save: (name) async => repository.renameFamily(name),
+                    ),
                   ),
-                ),
               ]),
               Row(children: [
-                Expanded(child: Text(context.t('app_family_you_as', {'name': me?.name ?? ''}), style: TextStyle(fontSize: 14, color: muted))),
-                IconButton(
-                  tooltip: context.t('app_family_rename'),
-                  icon: Icon(Icons.edit_outlined, size: 20, color: context.isDark ? Tw.amber400 : Tw.amber600),
-                  onPressed: () => askListTypeName(
-                    context,
-                    title: context.rt('app_family_my_name_title'),
-                    initial: me?.name ?? '',
-                    save: (name) async => repository.renameMe(name),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(linkIcon, size: 18, color: linkColor),
-                const SizedBox(width: 8),
-                Expanded(child: Text(linkText, style: TextStyle(fontSize: 13, color: linkColor, fontWeight: FontWeight.w600))),
+                Icon(linkIcon, size: 16, color: linkColor),
+                const SizedBox(width: 6),
+                Expanded(child: Text(linkText, style: TextStyle(fontSize: 12, color: linkColor, fontWeight: FontWeight.w600))),
               ]),
             ],
           ),
         ),
         const SizedBox(height: 12),
 
-        // The people
-        Panel(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(context.t('app_family_members'), style: const TextStyle(fontSize: 20)),
-              const SizedBox(height: 8),
-              for (final member in repository.localMembers) _member(context, repository, nearby, member, muted),
-            ],
-          ),
+        Row(
+          children: [
+            FamilyTabPill(label: context.t('members'), selected: !_showTypes, onTap: () => setState(() => _showTypes = false)),
+            const SizedBox(width: 8),
+            FamilyTabPill(label: context.t('list_types'), selected: _showTypes, onTap: () => setState(() => _showTypes = true)),
+          ],
         ),
         const SizedBox(height: 12),
 
-        // The code and the QR code
-        if (family != null)
-          Panel(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.t('app_offline_code'), style: const TextStyle(fontSize: 20)),
-                const SizedBox(height: 4),
-                Text(context.t('app_family_qr_help'), style: TextStyle(fontSize: 12, color: muted)),
-                const SizedBox(height: 12),
-                Center(child: FamilyQr(code: family.code, familyName: me?.familyName ?? family.familyName)),
-                const SizedBox(height: 12),
-                Center(
-                  child: SelectableText(
-                    LocalFamilyCodes.format(family.code),
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: 2),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: PillButton(
-                    label: context.t('app_offline_copy'),
-                    icon: Icons.copy,
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: LocalFamilyCodes.format(family.code)));
-                      if (context.mounted) toast(context, context.rt('app_offline_copied'));
-                    },
-                  ),
-                ),
-              ],
+        // Only the admin brings people in (the code is what lets a phone join) and shapes the list types
+        if (admin && family != null && !_showTypes)
+          Align(
+            alignment: Alignment.centerRight,
+            child: PillButton(
+              label: context.t('app_family_invite'),
+              icon: Icons.qr_code_2,
+              onPressed: () => showFamilyCode(context, family.code, me?.familyName ?? family.familyName),
+            ),
+          )
+        else if (admin && _showTypes)
+          Align(
+            alignment: Alignment.centerRight,
+            child: PillButton(
+              label: context.t('new_list_type'),
+              icon: Icons.add,
+              onPressed: () => askListTypeName(context, title: context.rt('new_list_type'), save: (name) async => repository.addLocalType(name)),
             ),
           ),
-        const SizedBox(height: 12),
+        if (admin) const SizedBox(height: 12),
 
-        // The list types
-        Panel(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Expanded(child: Text(context.t('app_family_types'), style: const TextStyle(fontSize: 20))),
-                PillButton(
-                  label: context.t('app_family_type_new'),
-                  icon: Icons.add,
-                  onPressed: () => askListTypeName(
-                    context,
-                    title: context.rt('app_family_type_new'),
-                    save: (name) async => repository.addLocalType(name),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 4),
-              for (final type in repository.localTypes) _type(context, repository, type, muted),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+        if (!_showTypes)
+          for (final member in repository.localMembers) ...[_memberCard(context, repository, nearby, member, admin), const SizedBox(height: 8)]
+        else
+          for (final type in repository.localTypes) ...[_typeCard(context, repository, type, admin), const SizedBox(height: 8)],
 
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.center,
           child: OutlinedButton(onPressed: () => signOut(context), child: Text(context.t('app_offline_leave').toUpperCase())),
@@ -167,78 +125,137 @@ class LocalFamilyScreen extends StatelessWidget {
     );
   }
 
-  Widget _member(BuildContext context, Repository repository, NearbyService nearby, LocalMember member, Color muted) {
-    final isMe = member.id == repository.localMyId;
+  Widget _memberCard(BuildContext context, Repository repository, NearbyService nearby, LocalMember member, bool admin) {
+    final dark = context.isDark;
+    final muted = dark ? Tw.gray400 : Tw.gray500;
+    final own = member.id == repository.localMyId;
     final connected = nearby.connectedMemberId == member.id;
 
     final String status;
-    final Color color;
-    if (isMe) {
-      status = context.t('app_family_this_phone');
-      color = muted;
+    final Color statusColor;
+    if (own) {
+      status = context.t('active');
+      statusColor = Tw.green500;
     } else if (connected) {
       status = context.t('app_family_connected_now');
-      color = context.isDark ? Tw.green500 : Tw.green600;
+      statusColor = Tw.green500;
     } else if (member.seenAt != null) {
       status = context.t('app_family_seen', {'time': _ago(context, member.seenAt!)});
-      color = muted;
+      statusColor = Tw.gray500;
     } else {
       status = context.t('app_family_not_met');
-      color = muted;
+      statusColor = Tw.yellow500;
     }
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      leading: Icon(isMe ? Icons.person : Icons.person_outline, color: connected ? color : null),
-      title: Text(isMe ? '${member.name}  (${context.t('app_family_you')})' : member.name),
-      subtitle: Text(status, style: TextStyle(fontSize: 12, color: color)),
-      trailing: isMe
-          ? null
-          : IconButton(
-              tooltip: context.t('app_family_remove_member'),
-              icon: Icon(Icons.person_remove_outlined, color: context.isDark ? Tw.red400 : Tw.red600),
-              onPressed: () async {
-                if (await confirm(context, context.rt('app_family_remove_confirm', {'name': member.name}), action: context.rt('app_family_remove_member'))) {
-                  repository.removeLocalMember(member.id);
-                }
-              },
-            ),
+    void open() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LocalMemberScreen(memberId: member.id)));
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: open,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(own ? '${member.name}  (${context.t('app_you')})' : member.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(own ? context.t('app_family_this_phone') : context.t('app_family_other_phone'), style: TextStyle(fontSize: 13, color: muted)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  StatusPill(text: context.t(member.founder ? 'role_admin' : 'role_member'), color: member.founder ? Tw.purple500 : Tw.blue500),
+                  StatusPill(text: status, color: statusColor),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Everyone changes their own name; the admin sets what the others may do
+                  if (own || (admin && !member.founder))
+                    IconButton(
+                      tooltip: context.t('edit'),
+                      icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
+                      onPressed: own
+                          ? () => askListTypeName(
+                                context,
+                                title: context.rt('app_family_my_name_title'),
+                                initial: member.name,
+                                save: (name) async => repository.renameMe(name),
+                              )
+                          : open,
+                    )
+                  else
+                    IconButton(tooltip: context.t('app_family_see'), icon: const Icon(Icons.visibility_outlined), onPressed: open),
+                  if (admin && !own)
+                    IconButton(
+                      tooltip: context.t('delete'),
+                      icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
+                      onPressed: () async {
+                        if (await confirm(context, context.rt('app_family_remove_confirm', {'name': member.name}), action: context.rt('app_family_remove_member'))) {
+                          repository.removeLocalMember(member.id);
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _type(BuildContext context, Repository repository, MapEntry<int, String> type, Color muted) {
+  Widget _typeCard(BuildContext context, Repository repository, MapEntry<int, String> type, bool admin) {
+    final dark = context.isDark;
+    final muted = dark ? Tw.gray400 : Tw.gray500;
     final lists = repository.listsOfType(type.key);
     final canDelete = type.key != Repository.localTypeId && lists == 0;
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(type.value),
-      subtitle: Text(context.t('app_family_type_lists', {'count': lists}), style: TextStyle(fontSize: 12, color: muted)),
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton(
-          tooltip: context.t('app_family_rename'),
-          icon: Icon(Icons.edit_outlined, color: context.isDark ? Tw.amber400 : Tw.amber600),
-          onPressed: () => askListTypeName(
-            context,
-            title: context.rt('app_family_type_rename'),
-            initial: type.value,
-            save: (name) async => repository.renameLocalType(type.key, name),
-          ),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(type.value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  Text('${context.t('lists')}: $lists', style: TextStyle(fontSize: 13, color: muted)),
+                ],
+              ),
+            ),
+            if (admin) ...[
+              IconButton(
+                tooltip: context.t('edit'),
+                icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
+                onPressed: () => askListTypeName(
+                  context,
+                  title: context.rt('app_family_type_rename'),
+                  initial: type.value,
+                  save: (name) async => repository.renameLocalType(type.key, name),
+                ),
+              ),
+              // A type that still has lists cannot go: the same rule as for a server family
+              if (canDelete)
+                IconButton(
+                  tooltip: context.t('delete'),
+                  icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
+                  onPressed: () async {
+                    if (await confirm(context, context.rt('app_family_type_delete_confirm', {'name': type.value}))) {
+                      repository.deleteLocalType(type.key);
+                    }
+                  },
+                )
+              else
+                Padding(padding: const EdgeInsets.only(right: 12), child: Text(context.t('app_type_in_use'), style: TextStyle(fontSize: 12, color: muted))),
+            ],
+          ],
         ),
-        IconButton(
-          tooltip: canDelete ? context.t('delete') : context.t('app_family_type_in_use'),
-          icon: Icon(Icons.delete_outline, color: canDelete ? (context.isDark ? Tw.red400 : Tw.red600) : muted),
-          onPressed: !canDelete
-              ? null
-              : () async {
-                  if (await confirm(context, context.rt('app_family_type_delete_confirm', {'name': type.value}))) {
-                    repository.deleteLocalType(type.key);
-                  }
-                },
-        ),
-      ]),
+      ),
     );
   }
 

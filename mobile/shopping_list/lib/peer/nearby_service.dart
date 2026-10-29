@@ -457,8 +457,20 @@ class NearbyService extends ChangeNotifier {
 
   /// One meeting over the connection: hello, proof, ready, offer, done. The connection is kept
   /// afterwards, so the next round (when something changes, on either phone) needs no new connection.
-  Future<void> _runRound(_Link link, {bool? fast}) async {
-    if (link.sessionActive || link.finished || !_running) return;
+  /// Tell the phone this one is connected to what there is to tell, right now (leaving the family
+  /// is the case: it must be said before it is forgotten). False when there is no such phone.
+  Future<bool> sendNow() async {
+    final link = _link;
+    if (link == null || !link.established || link.finished) return false;
+
+    for (var i = 0; i < 50 && link.sessionActive && !link.finished; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return _runRound(link);
+  }
+
+  Future<bool> _runRound(_Link link, {bool? fast}) async {
+    if (link.sessionActive || link.finished || !_running) return false;
 
     link.sessionActive = true;
     link.editMarkAtStart = repository.editMark;
@@ -498,15 +510,16 @@ class NearbyService extends ChangeNotifier {
 
     link.sessionActive = false;
     await channel.close();
-    if (link.finished) return;
+    if (link.finished) return false;
 
     if (result.status == PeerStatus.done) {
       _roundDone(link, result);
-      return;
+      return true;
     }
 
     await radio.disconnect(link.endpointId);
     _finish(link, result);
+    return false;
   }
 
   void _roundDone(_Link link, PeerResult result) {

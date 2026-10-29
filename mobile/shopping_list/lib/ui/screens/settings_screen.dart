@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/api_client.dart';
 import '../../data/repository.dart';
-import '../../peer/local_family.dart';
 import '../../peer/nearby_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/notification_service.dart';
@@ -235,11 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 4),
           Text(context.t('app_offline_mode_note'), style: TextStyle(fontSize: 12, color: muted)),
           const SizedBox(height: 12),
-          if (code != null) ...[
-            Text(context.t('app_offline_code'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: context.isDark ? Tw.gray300 : Tw.gray700)),
-            const SizedBox(height: 4),
-            SelectableText(LocalFamilyCodes.format(code.code), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: 2)),
-            const SizedBox(height: 8),
+          if (code != null && repository.isLocalAdmin) ...[
             Align(
               alignment: Alignment.centerRight,
               child: PillButton(label: context.t('app_offline_show_code'), icon: Icons.qr_code_2, onPressed: () => showFamilyCode(context, code.code, repository.me?.familyName ?? '')),

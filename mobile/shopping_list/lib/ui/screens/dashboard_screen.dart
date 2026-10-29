@@ -18,13 +18,18 @@ IconData stateIcon(ListState state) => switch (state) {
       ListState.mixed => Icons.playlist_add_check,
     };
 
-/// The web's dashboard: one card per list with its counters.
+/// The overview: where the shopping stands across every list (the Shopping List tab is where the
+/// lists are): totals, what is in the cart, what is still to buy, and how far each list has got.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  /// How many of the items still to buy are shown.
+  static const _toBuyShown = 8;
+
   @override
   Widget build(BuildContext context) {
-    final lists = context.watch<Repository>().lists;
+    final repository = context.watch<Repository>();
+    final lists = repository.lists;
 
     return RefreshIndicator(
       onRefresh: context.read<SyncService>().sync,
@@ -37,24 +42,153 @@ class DashboardScreen extends StatelessWidget {
                 Text(context.t('dashboard_information'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
               ],
             )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 720 ? 2 : 1;
+          : _overview(context, repository, lists),
+    );
+  }
 
-                return GridView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: scrollPadding,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    mainAxisExtent: 190,
-                  ),
-                  itemCount: lists.length,
-                  itemBuilder: (context, index) => DashboardCard(list: lists[index]),
-                );
-              },
+  Widget _overview(BuildContext context, Repository repository, List<ShoppingListRecord> lists) {
+    final dark = context.isDark;
+    final muted = dark ? Tw.gray400 : Tw.gray500;
+
+    final items = [
+      for (final list in lists)
+        for (final item in repository.itemsOf(list.uuid)) (list: list, item: item),
+    ];
+
+    final inCart = items.where((e) => e.item.status == ItemStatus.inCart).toList()
+      ..sort((a, b) {
+        final byList = a.list.name.toLowerCase().compareTo(b.list.name.toLowerCase());
+        return byList != 0 ? byList : a.item.name.toLowerCase().compareTo(b.item.name.toLowerCase());
+      });
+
+    // the newest first (an item's name is stamped when it is added)
+    final toBuy = items.where((e) => e.item.status == ItemStatus.toBuy).toList()
+      ..sort((a, b) => b.item.nameChangedAt.compareTo(a.item.nameChangedAt));
+
+    final progress = lists.where((l) => l.total > 0).toList()
+      ..sort((a, b) => ((b.purchased + b.inCart) / b.total).compareTo((a.purchased + a.inCart) / a.total));
+
+    final toBuyCount = lists.fold<int>(0, (sum, l) => sum + l.toBuy);
+    final inCartCount = lists.fold<int>(0, (sum, l) => sum + l.inCart);
+    final purchasedCount = lists.fold<int>(0, (sum, l) => sum + l.purchased);
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: scrollPadding,
+      children: [
+        Row(children: [
+          _tile(context, lists.length, 'dashboard_lists', dark ? Tw.gray300 : Tw.gray700),
+          const SizedBox(width: 8),
+          _tile(context, toBuyCount, 'pending', dark ? Tw.amber400 : Tw.amber600),
+          const SizedBox(width: 8),
+          _tile(context, inCartCount, 'in_cart', dark ? Tw.blue500 : Tw.blue600),
+          const SizedBox(width: 8),
+          _tile(context, purchasedCount, 'purchased', dark ? Tw.green500 : Tw.green600),
+        ]),
+        const SizedBox(height: 12),
+        _section(
+          context,
+          'dashboard_in_cart',
+          inCart.isEmpty
+              ? [Text(context.t('dashboard_cart_empty'), style: TextStyle(fontSize: 13, color: muted))]
+              : [for (final e in inCart) _itemRow(context, e.list, e.item)],
+        ),
+        const SizedBox(height: 12),
+        _section(
+          context,
+          'dashboard_to_buy',
+          toBuy.isEmpty
+              ? [Text(context.t('dashboard_nothing_to_buy'), style: TextStyle(fontSize: 13, color: muted))]
+              : [
+                  for (final e in toBuy.take(_toBuyShown)) _itemRow(context, e.list, e.item),
+                  if (toBuy.length > _toBuyShown)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(context.t('dashboard_more', {'count': toBuy.length - _toBuyShown}), style: TextStyle(fontSize: 12, color: muted)),
+                    ),
+                ],
+        ),
+        if (progress.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _section(context, 'dashboard_progress', [for (final list in progress) _progressRow(context, list)]),
+        ],
+      ],
+    );
+  }
+
+  Widget _tile(BuildContext context, int value, String labelKey, Color color) {
+    return Expanded(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(children: [
+            Text('$value', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color)),
+            const SizedBox(height: 2),
+            Text(context.t(labelKey), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: context.isDark ? Tw.gray400 : Tw.gray500)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _section(BuildContext context, String titleKey, List<Widget> children) {
+    return Panel(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.t(titleKey), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _itemRow(BuildContext context, ShoppingListRecord list, ItemRecord item) {
+    final muted = context.isDark ? Tw.gray400 : Tw.gray500;
+
+    return InkWell(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: list.uuid))),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Expanded(child: Text('${item.name}  × ${item.quantity}', maxLines: 1, overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: 8),
+          Text(list.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: muted)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _progressRow(BuildContext context, ShoppingListRecord list) {
+    final dark = context.isDark;
+    final bought = list.purchased / list.total;
+    final carted = list.inCart / list.total;
+
+    return InkWell(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: list.uuid))),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(list.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+            Text('${list.purchased}/${list.total}', style: TextStyle(fontSize: 12, color: dark ? Tw.gray400 : Tw.gray500)),
+          ]),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 8,
+              child: Row(children: [
+                Expanded(flex: (bought * 1000).round(), child: Container(color: Tw.green500)),
+                Expanded(flex: (carted * 1000).round(), child: Container(color: Tw.blue500)),
+                Expanded(flex: ((1 - bought - carted) * 1000).round().clamp(0, 1000), child: Container(color: dark ? Tw.gray700 : Tw.gray200)),
+              ]),
             ),
+          ),
+        ]),
+      ),
     );
   }
 }

@@ -127,10 +127,44 @@ Future<void> signOut(BuildContext context) async {
   final auth = context.read<AuthState>();
   final settings = context.read<SettingsState>();
 
-  // A local family: its lists stay on the other phones, and go from this one
+  // An offline family: its lists stay on the other phones, and go from this one. Before they do, this
+  // phone says it is leaving (and, for the admin, hands the family over to the oldest member).
   if (auth.isLocal) {
-    final leave = await confirm(context, settings.t('app_offline_leave_confirm'), action: settings.t('app_offline_leave'));
-    if (!leave) return;
+    final nearby = context.read<NearbyService>();
+    final admin = repository.isLocalAdmin;
+    final others = repository.localMembers.length > 1;
+    final connected = nearby.connectedMemberId != null;
+
+    // The admin's hand-over has to reach a phone before this one forgets it
+    if (admin && others && !connected) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          content: Text(settings.t('app_offline_leave_admin_needs_phone')),
+          actions: [FilledButton(onPressed: () => Navigator.pop(dialog), child: Text(settings.t('app_offline_done')))],
+        ),
+      );
+      return;
+    }
+
+    final heir = admin && others ? repository.localHeir : null;
+    final message = heir != null
+        ? settings.t('app_offline_leave_admin_confirm', {'name': heir.name})
+        : others && !connected
+            ? settings.t('app_offline_leave_alone_confirm')
+            : settings.t('app_offline_leave_confirm');
+
+    if (!await confirm(context, message, action: settings.t('app_offline_leave'))) return;
+
+    if (others) {
+      if (!await repository.prepareLeaving()) return;
+
+      final said = await nearby.sendNow();
+      if (!said && admin) {
+        if (context.mounted) toast(context, settings.t('app_offline_leave_not_said'));
+        return;
+      }
+    }
 
     await auth.logout();
     return;

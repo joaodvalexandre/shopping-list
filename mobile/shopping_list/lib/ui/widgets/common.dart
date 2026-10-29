@@ -18,6 +18,40 @@ extension TextsOnContext on BuildContext {
 }
 
 /// The web's rounded call-to-action button ("New List", "Finish List"...).
+/// The web's two pills for switching between a family's people and its list types: the current
+/// one dark, the other light. Shared by the server family's page and the offline one.
+class FamilyTabPill extends StatelessWidget {
+  const FamilyTabPill({super.key, required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+
+    return Material(
+      color: selected ? (dark ? Tw.gray200 : Tw.gray800) : (dark ? Tw.gray700 : Tw.gray200),
+      shape: const StadiumBorder(),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: selected ? (dark ? Tw.gray800 : Colors.white) : (dark ? Tw.gray200 : Tw.gray800),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class PillButton extends StatelessWidget {
   const PillButton({
     super.key,

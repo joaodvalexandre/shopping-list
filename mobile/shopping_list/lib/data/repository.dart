@@ -8,6 +8,7 @@ import '../core/time.dart';
 import 'local_db.dart';
 import 'me.dart';
 import 'models.dart';
+import '../peer/local_family.dart';
 import 'peer_info.dart';
 
 /// A change the server refused (the person lacked the permission, the list was
@@ -37,15 +38,51 @@ class LocalType {
 
 /// A person of a local family, as this phone knows them.
 class LocalMember {
-  LocalMember({required this.id, required this.name, required this.nameAt, required this.joinedAt, this.seenAt});
+  LocalMember({
+    required this.id,
+    required this.number,
+    required this.name,
+    required this.nameAt,
+    required this.joinedAt,
+    this.seenAt,
+    this.key,
+    this.founder = false,
+    this.rights,
+    this.permAt = 0,
+    this.permSig,
+  });
 
   final String id;
+
+  /// A whole number of their own, which is what a list's "hidden from" holds (as on the server).
+  final int number;
   String name;
   int nameAt;
   final int joinedAt;
 
   /// When this phone last talked to theirs (told to nobody: only this phone's own knowledge).
   int? seenAt;
+
+  /// Their phone's public key (the first one seen for them is kept): what proves, when phones
+  /// connect, that a phone is who it says.
+  String? key;
+
+  /// The person who started the family: its admin, who alone may change what the others can do.
+  bool founder;
+
+  /// What the admin allowed them, per list type (ability names such as `can_view`), signed by the
+  /// admin. Null when nothing was set: then they may do everything.
+  Map<int, List<String>>? rights;
+  int permAt;
+  String? permSig;
+}
+
+/// Signs for this phone (the key it proves itself with to the family's other phones).
+class LocalSigner {
+  LocalSigner({required this.publicKey, required this.sign});
+
+  final Future<String> Function() publicKey;
+  final Future<String> Function(String message) sign;
 }
 
 /// The family's lists and items on this phone.
@@ -103,7 +140,10 @@ class Repository extends ChangeNotifier {
     final rawMe = await _db.getMeta('me');
     _me = rawMe == null ? null : Me.fromJson(jsonDecode(rawMe) as Map<String, dynamic>);
     _local = await _db.getMeta('local_family') != null;
-    if (_local) await _loadLocalState();
+    if (_local) {
+      await _loadLocalState();
+      await _saveLocalState(); // what an older version did not have (numbers, who started it) is kept from now on
+    }
 
     _tombstones
       ..clear()
@@ -115,14 +155,14 @@ class Repository extends ChangeNotifier {
 
   /// Lists to show, by name. Lists deleted on this phone but not yet on the server are hidden.
   List<ShoppingListRecord> get lists {
-    final visible = _lists.values.where((list) => !list.pending.isDeleted).toList()
+    final visible = _lists.values.where((list) => !list.pending.isDeleted && _visibleToMe(list)).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return visible;
   }
 
   ShoppingListRecord? list(String uuid) {
     final list = _lists[uuid];
-    return (list == null || list.pending.isDeleted) ? null : list;
+    return (list == null || list.pending.isDeleted || !_visibleToMe(list)) ? null : list;
   }
 
   /// Items of a list to show: to buy first, then in the cart, then purchased (like the web).
@@ -180,6 +220,7 @@ class Repository extends ChangeNotifier {
     if (hiddenFrom != null && !_sameIds(hiddenFrom, list.hiddenFrom)) {
       list.hiddenFrom = List.of(hiddenFrom);
       list.pending.mark('hidden_from', at);
+      if (_local) list.nameChangedAt = at; // the name and who it is hidden from travel under one stamp
     }
 
     _changed(saveLists: [list]);
@@ -880,6 +921,12 @@ class Repository extends ChangeNotifier {
   String _familyName = '';
   int _familyNameAt = 0;
 
+  /// The last time the family was handed over (an admin leaving): to whom, when, and the old
+  /// admin's signature that makes it believable. Nothing until it happens.
+  String? _ownerTo;
+  int _ownerAt = 0;
+  String? _ownerSig;
+
   /// Who this phone is in the local family (an id of its own, told to the others).
   String get localMyId => _localMyId;
 
@@ -924,9 +971,20 @@ class Repository extends ChangeNotifier {
       ..[localTypeId] = LocalType(typeName, creating ? now : 0);
     _localMembers
       ..clear()
-      ..[memberId] = LocalMember(id: memberId, name: myName.trim(), nameAt: now, joinedAt: now);
+      ..[memberId] = LocalMember(
+        id: memberId,
+        number: _newMemberNumber(),
+        name: myName.trim(),
+        nameAt: now,
+        joinedAt: now,
+        key: await _signer?.publicKey(),
+        founder: creating, // whoever starts the family is its admin
+      );
     _familyName = familyName.trim();
     _familyNameAt = creating ? now : 0;
+    _ownerTo = null;
+    _ownerAt = 0;
+    _ownerSig = null;
 
     await _saveLocalState();
     notifyListeners();
@@ -947,8 +1005,10 @@ class Repository extends ChangeNotifier {
       _familyNameAt = 0;
       _localTypes[localTypeId] = LocalType(defaultTypeName, 0);
       if (_localMyId.isNotEmpty) {
-        _localMembers[_localMyId] = LocalMember(id: _localMyId, name: _me?.name ?? mine['my_name'] as String? ?? '', nameAt: nowMs(), joinedAt: nowMs());
+        _localMembers[_localMyId] =
+            LocalMember(id: _localMyId, number: _newMemberNumber(), name: _me?.name ?? mine['my_name'] as String? ?? '', nameAt: nowMs(), joinedAt: nowMs());
       }
+      _adoptFounderRole(mine);
       return;
     }
 
@@ -956,6 +1016,10 @@ class Repository extends ChangeNotifier {
     _localMyId = state['my_id'] as String? ?? '';
     _familyName = asMap(state['family'])['name'] as String? ?? '';
     _familyNameAt = (asMap(state['family'])['at'] as num?)?.toInt() ?? 0;
+    final owner = asMap(state['owner']);
+    _ownerTo = owner['to'] as String?;
+    _ownerAt = (owner['at'] as num?)?.toInt() ?? 0;
+    _ownerSig = owner['sig'] as String?;
     asMap(state['types']).forEach((id, type) {
       final map = asMap(type);
       _localTypes[int.parse(id)] = LocalType(map['name'] as String? ?? '', (map['at'] as num?)?.toInt() ?? 0);
@@ -964,12 +1028,49 @@ class Repository extends ChangeNotifier {
       final map = asMap(member);
       _localMembers[id] = LocalMember(
         id: id,
+        number: (map['number'] as num?)?.toInt() ?? _newMemberNumber(),
         name: map['name'] as String? ?? '',
         nameAt: (map['at'] as num?)?.toInt() ?? 0,
         joinedAt: (map['joined'] as num?)?.toInt() ?? 0,
         seenAt: (map['seen'] as num?)?.toInt(),
+        key: map['key'] as String?,
+        founder: map['founder'] == true,
+        rights: _rightsFromJson(map['rights']),
+        permAt: (map['perm_at'] as num?)?.toInt() ?? 0,
+        permSig: map['perm_sig'] as String?,
       );
     });
+    _adoptFounderRole(mine);
+  }
+
+  /// A family made before there were admins: the phone that was given the family's name when it
+  /// started it (a phone that joined had none) is the one that started it.
+  void _adoptFounderRole(Map<String, dynamic> identity) {
+    if (_localMembers.values.any((m) => m.founder)) return;
+
+    final started = (identity['family_name'] as String? ?? '').isNotEmpty;
+    final me = _localMembers[_localMyId];
+    if (started && me != null) me.founder = true;
+  }
+
+  static Map<int, List<String>>? _rightsFromJson(Object? json) {
+    if (json == null) return null;
+
+    return {
+      for (final entry in asMap(json).entries) int.parse(entry.key): [for (final code in (entry.value as List? ?? const [])) code.toString()],
+    };
+  }
+
+  static Map<String, dynamic>? _rightsToJson(Map<int, List<String>>? rights) =>
+      rights == null ? null : {for (final entry in rights.entries) '${entry.key}': entry.value};
+
+  int _newMemberNumber() {
+    final random = Random.secure();
+    var number = 1 + random.nextInt(0x7fffffff - 1);
+    while (_localMembers.values.any((m) => m.number == number)) {
+      number = 1 + random.nextInt(0x7fffffff - 1);
+    }
+    return number;
   }
 
   Future<void> _saveLocalState() async {
@@ -978,9 +1079,22 @@ class Repository extends ChangeNotifier {
       jsonEncode({
         'my_id': _localMyId,
         'family': {'name': _familyName, 'at': _familyNameAt},
+        'owner': {'to': _ownerTo, 'at': _ownerAt, 'sig': _ownerSig},
         'types': {for (final e in _localTypes.entries) '${e.key}': {'name': e.value.name, 'at': e.value.nameAt}},
         'members': {
-          for (final m in _localMembers.values) m.id: {'name': m.name, 'at': m.nameAt, 'joined': m.joinedAt, 'seen': m.seenAt},
+          for (final m in _localMembers.values)
+            m.id: {
+              'number': m.number,
+              'name': m.name,
+              'at': m.nameAt,
+              'joined': m.joinedAt,
+              'seen': m.seenAt,
+              'key': m.key,
+              'founder': m.founder,
+              'rights': _rightsToJson(m.rights),
+              'perm_at': m.permAt,
+              'perm_sig': m.permSig,
+            },
         },
       }),
     );
@@ -989,16 +1103,24 @@ class Repository extends ChangeNotifier {
 
   /// `me` is what the rest of the app reads: this person, the family's name and its list types.
   Future<void> _rebuildLocalMe() async {
+    final mine = _localMembers[_localMyId];
+    final canManageSomething = _localTypes.keys.any((id) => _memberCan(_localMyId, id, Ability.manageLists));
+
     final json = {
-      'user': {'id': 1, 'name': _localMembers[_localMyId]?.name ?? '', 'email': '', 'role': 'member'},
+      'user': {'id': mine?.number ?? 1, 'name': mine?.name ?? '', 'email': '', 'role': mine?.founder == true ? 'admin' : 'member'},
       'family': {'name': _familyName},
       'list_types': [
         for (final e in _localTypes.entries) {'id': e.key, 'name': e.value.name},
       ],
       'permissions': {
-        for (final id in _localTypes.keys) '$id': {for (final key in abilityKeys.values) key: true},
+        for (final id in _localTypes.keys) '$id': {for (final ability in Ability.values) abilityKeys[ability]!: _memberCan(_localMyId, id, ability)},
       },
-      'members': const [],
+      // those who manage lists may hide them from others (as on the server)
+      'members': [
+        if (canManageSomething)
+          for (final m in _localMembers.values)
+            if (m.id != _localMyId) {'id': m.number, 'name': m.name},
+      ],
     };
 
     await _db.setMeta('me', jsonEncode(json));
@@ -1072,6 +1194,55 @@ class Repository extends ChangeNotifier {
     _familyChanged();
   }
 
+  /// The person who would take over the family if its admin left: the one who has been in it longest.
+  LocalMember? get localHeir {
+    final others = _localMembers.values.where((m) => m.id != _localMyId && m.key != null).toList()
+      ..sort((a, b) {
+        final byJoined = a.joinedAt.compareTo(b.joinedAt);
+        return byJoined != 0 ? byJoined : a.id.compareTo(b.id);
+      });
+    return others.firstOrNull;
+  }
+
+  /// What leaving takes: this phone's person is struck off the others' list, and an admin hands the
+  /// family to the oldest member (signed with the admin's key, so every phone believes it).
+  /// The phone then has to tell another one, before it forgets the family. False when it cannot be done.
+  Future<bool> prepareLeaving() async {
+    final me = _localMembers[_localMyId];
+    if (!_local || me == null) return false;
+
+    if (me.founder && _localMembers.length > 1) {
+      final heir = localHeir;
+      final signer = _signer;
+      if (heir == null || signer == null) return false;
+
+      final at = nowMs() > _ownerAt ? nowMs() : _ownerAt + 1;
+      _ownerTo = heir.id;
+      _ownerAt = at;
+      _ownerSig = await signer.sign(_ownerMessage(heir.id, at));
+    }
+
+    _rememberKey('member:${me.id}', 'member');
+    _familyChanged();
+    return true;
+  }
+
+  static String _ownerMessage(String toMemberId, int at) => 'owner|$toMemberId|$at';
+
+  /// The family has a new admin: their own phone signs again what the old admin had signed (what each person may do),
+  /// since it is the new admin's word that counts from now on.
+  Future<void> _signRightsAgain() async {
+    final signer = _signer;
+    if (signer == null) return;
+
+    for (final member in _localMembers.values) {
+      if (member.rights == null || member.founder) continue;
+
+      member.permAt = nowMs() > member.permAt ? nowMs() : member.permAt + 1;
+      member.permSig = await signer.sign(_permMessage(member.id, member.permAt, member.rights!));
+    }
+  }
+
   /// This phone just talked to the phone of [memberId].
   void noteSeen(String memberId) {
     final member = _localMembers[memberId];
@@ -1087,6 +1258,101 @@ class Repository extends ChangeNotifier {
     _db.setMeta(_tombstoneMetaKey, jsonEncode(_tombstones));
   }
 
+  // ------------------------------------------------------ who may do what (local)
+  //
+  // The person who started the family is its admin. What each of the others may do (per list
+  // type) is set by the admin and signed with the admin's key, so every phone can tell it is the
+  // admin's word and nobody can give themselves more. When two phones meet each proves its
+  // identity with its own key; the one receiving a change checks that the sender may make it, and a
+  // list is never sent to someone it is hidden from or who may not see its type. (A phone that is
+  // changed to ignore this cannot be stopped by the others; this is a family, not a bank.)
+
+  LocalSigner? _signer;
+  LocalSigner? get localSigner => _signer;
+
+  /// Tell the family which key this phone proves itself with, and make sure it is on the list.
+  Future<void> attachSigner(LocalSigner signer) async {
+    _signer = signer;
+
+    final me = _localMembers[_localMyId];
+    if (!_local || me == null) return;
+
+    final key = await signer.publicKey();
+    if (me.key != key) {
+      me.key = key;
+      await _saveLocalState();
+    }
+  }
+
+  bool get isLocalAdmin => _localMembers[_localMyId]?.founder ?? false;
+
+  /// The key a person of the family is known by (null: not seen yet).
+  String? localMemberKey(String memberId) => _localMembers[memberId]?.key;
+
+  /// What a person may do in a list type. The admin may do everything; so may anyone the admin
+  /// has said nothing about, and anyone this phone does not know yet; a person the admin set
+  /// rights for may do what was set. With no [memberId] there are no limits (tests, old paths).
+  bool _memberCan(String? memberId, int typeId, Ability ability) {
+    if (memberId == null) return true;
+
+    final member = _localMembers[memberId];
+    if (member == null || member.founder || member.rights == null) return true;
+
+    final granted = member.rights![typeId];
+    if (granted == null) return false;
+    return ability == Ability.view ? granted.isNotEmpty : granted.contains(abilityKeys[ability]);
+  }
+
+  /// What a person may do in each list type, for the screens.
+  Map<int, Map<Ability, bool>> localRightsOf(String memberId) => {
+        for (final typeId in _localTypes.keys) typeId: {for (final ability in Ability.values) ability: _memberCan(memberId, typeId, ability)},
+      };
+
+  bool _visibleToMe(ShoppingListRecord list) => !_local || _visibleTo(_localMyId, list);
+
+  /// A list is for someone when they may see its type and it is not hidden from them.
+  bool _visibleTo(String? memberId, ShoppingListRecord list) {
+    if (memberId == null) return true;
+
+    final member = _localMembers[memberId];
+    return _memberCan(memberId, list.listTypeId, Ability.view) && (member == null || !list.hiddenFrom.contains(member.number));
+  }
+
+  /// The admin sets what a person may do, per list type. Returns false when it is not allowed
+  /// (not the admin, or the admin themself).
+  Future<bool> setLocalRights(String memberId, Map<int, Map<Ability, bool>> rights) async {
+    final member = _localMembers[memberId];
+    final signer = _signer;
+    if (!isLocalAdmin || signer == null || member == null || member.founder) return false;
+
+    final normal = <int, List<String>>{};
+    rights.forEach((typeId, abilities) {
+      final others = [for (final a in Ability.values) if (a != Ability.view && abilities[a] == true) abilityKeys[a]!];
+      if (abilities[Ability.view] == true || others.isNotEmpty) normal[typeId] = [abilityKeys[Ability.view]!, ...others];
+    });
+
+    final now = nowMs();
+    member.rights = normal;
+    member.permAt = now > member.permAt ? now : member.permAt + 1;
+    member.permSig = await signer.sign(_permMessage(member.id, member.permAt, normal));
+
+    _familyChanged();
+    return true;
+  }
+
+  /// What the admin signs: who, when, and what they may do, in one fixed spelling.
+  static String _permMessage(String memberId, int at, Map<int, List<String>> rights) {
+    final types = rights.keys.toList()..sort();
+    return 'perm|$memberId|$at|${types.map((t) => '$t:${([...rights[t]!]..sort()).join(',')}').join(';')}';
+  }
+
+  Future<bool> _permIsFromAdmin(String memberId, int at, Map<int, List<String>> rights, String signature) async {
+    final adminKey = _localMembers.values.where((m) => m.founder && m.key != null).map((m) => m.key!).firstOrNull;
+    return adminKey != null && await LocalFamilyCrypto.verify(adminKey, _permMessage(memberId, at, rights), signature);
+  }
+
+  // ------------------------------------------------------------ sync (local)
+
   /// What this phone holds, for the other phone to compare with its own: when each list's name
   /// and each item's fields were last changed, the family's types, people and name, and what was deleted.
   Map<String, dynamic> buildLocalDigest() => {
@@ -1096,14 +1362,16 @@ class Repository extends ChangeNotifier {
             for (final item in list.items) item.uuid: [item.nameChangedAt, item.quantityChangedAt, item.statusChangedAt],
         },
         'types': {for (final e in _localTypes.entries) '${e.key}': e.value.nameAt},
-        'members': {for (final m in _localMembers.values) m.id: m.nameAt},
+        'members': {for (final m in _localMembers.values) m.id: [m.nameAt, m.permAt]},
         'family': _familyNameAt,
+        'owner': _ownerAt,
         'gone': {for (final entry in _tombstones.entries) entry.key: entry.value['at']},
       };
 
   /// What the phone that sent [digest] lacks or has older than this phone, and what this phone
-  /// deleted that it still holds.
-  Map<String, dynamic> buildLocalDelta(Map<String, dynamic> digest) {
+  /// deleted that it still holds. Only what [peerId] may see: lists hidden from them, or of a
+  /// type they may not view, are not even mentioned.
+  Map<String, dynamic> buildLocalDelta(Map<String, dynamic> digest, {String? peerId}) {
     final theirLists = asMap(digest['lists']);
     final theirItems = asMap(digest['items']);
     final theirTypes = asMap(digest['types']);
@@ -1125,14 +1393,38 @@ class Repository extends ChangeNotifier {
 
     for (final m in _localMembers.values) {
       if (theirGone.containsKey('member:${m.id}')) continue;
-      if (older(theirMembers[m.id], m.nameAt)) members.add({'id': m.id, 'name': m.name, 'at': m.nameAt, 'joined': m.joinedAt});
+
+      final theirs = theirMembers[m.id] as List?;
+      if (theirs == null || (theirs[0] as num).toInt() < m.nameAt || (theirs[1] as num).toInt() < m.permAt) {
+        members.add({
+          'id': m.id,
+          'number': m.number,
+          'name': m.name,
+          'at': m.nameAt,
+          'joined': m.joinedAt,
+          'key': m.key,
+          'founder': m.founder,
+          if (m.permSig != null) 'perm': {'at': m.permAt, 'rights': _rightsToJson(m.rights), 'sig': m.permSig},
+        });
+      }
     }
 
     for (final list in _lists.values) {
       if (theirGone.containsKey(list.uuid)) continue; // deleted over there: they will say so
 
+      if (!_visibleTo(peerId, list)) {
+        // Not for them to know about. If they hold it and it has just been hidden from them, they
+        // are told to let it go (with nothing of it: no name, no items).
+        final theirs = theirLists[list.uuid];
+        final theirNumber = peerId == null ? null : _localMembers[peerId]?.number;
+        if (theirs != null && theirNumber != null && list.hiddenFrom.contains(theirNumber) && older(theirs, list.nameChangedAt)) {
+          lists.add({'uuid': list.uuid, 'name': '-', 'name_at': list.nameChangedAt, 'type': list.listTypeId, 'hidden': list.hiddenFrom});
+        }
+        continue;
+      }
+
       if (older(theirLists[list.uuid], list.nameChangedAt)) {
-        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt, 'type': list.listTypeId});
+        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt, 'type': list.listTypeId, 'hidden': list.hiddenFrom});
       }
 
       for (final item in list.items) {
@@ -1161,13 +1453,22 @@ class Repository extends ChangeNotifier {
 
     _tombstones.forEach((key, entry) {
       final kind = entry['kind'];
+
+      if (kind == 'item') {
+        final list = _lists[entry['list']];
+        if (list != null && !_visibleTo(peerId, list)) return;
+      } else if (kind == 'list') {
+        final type = (entry['type'] as num?)?.toInt();
+        if (type != null && !_memberCan(peerId, type, Ability.view)) return;
+      }
+
       final held = switch (kind) {
         'list' => theirLists.containsKey(key),
         'type' => theirTypes.containsKey(key.substring('type:'.length)),
         'member' => theirMembers.containsKey(key.substring('member:'.length)),
         _ => theirItems.containsKey(key),
       };
-      if (held) gone.add({'uuid': key, 'kind': kind, 'at': entry['at'], 'list': entry['list']});
+      if (held) gone.add({'uuid': key, 'kind': kind, 'at': entry['at'], 'list': entry['list'], 'type': entry['type']});
     });
 
     return {
@@ -1177,12 +1478,14 @@ class Repository extends ChangeNotifier {
       'members': members,
       'gone': gone,
       if (_familyNameAt > ((digest['family'] as num?)?.toInt() ?? 0)) 'family': {'name': _familyName, 'at': _familyNameAt},
+      if (_ownerSig != null && _ownerAt > ((digest['owner'] as num?)?.toInt() ?? 0)) 'owner': {'to': _ownerTo, 'at': _ownerAt, 'sig': _ownerSig},
     };
   }
 
   /// Take in what another phone of the family sent: deletions first (they win), then the family
-  /// itself, lists and items, each field only when it is newer than what is held.
-  Future<PeerApplied> applyLocalDelta(Map<String, dynamic> delta) async {
+  /// itself, lists and items, each field only when it is newer than what is held, and only what
+  /// [peerId] may do (a change they have no right to is left out, and never passed on).
+  Future<PeerApplied> applyLocalDelta(Map<String, dynamic> delta, {String? peerId}) async {
     final applied = PeerApplied();
     if (!_local || _me == null) return applied;
 
@@ -1193,6 +1496,72 @@ class Repository extends ChangeNotifier {
     var familyChanged = false;
 
     bool newer(Object? at, int held) => at is num && at.toInt() > held;
+    bool can(int typeId, Ability ability) => _memberCan(peerId, typeId, ability);
+    final myNumber = _localMembers[_localMyId]?.number;
+
+    for (final entry in (delta['members'] as List? ?? const []).cast<Map<String, dynamic>>()) {
+      final id = entry['id'] as String?;
+      final name = (entry['name'] as String?)?.trim();
+      if (id == null || name == null || name.isEmpty || _tombstones.containsKey('member:$id')) continue;
+
+      var member = _localMembers[id];
+      if (member == null) {
+        member = _localMembers[id] = LocalMember(
+          id: id,
+          number: (entry['number'] as num?)?.toInt() ?? _newMemberNumber(),
+          name: name,
+          nameAt: (entry['at'] as num?)?.toInt() ?? nowMs(),
+          joinedAt: (entry['joined'] as num?)?.toInt() ?? nowMs(),
+        );
+        familyChanged = true;
+      } else if (newer(entry['at'], member.nameAt)) {
+        member.name = name;
+        member.nameAt = (entry['at'] as num).toInt();
+        familyChanged = true;
+      }
+
+      // Their key: the first one seen is the one kept
+      if (member.key == null && entry['key'] is String) {
+        member.key = entry['key'] as String;
+        familyChanged = true;
+      }
+      // Who started the family: learned once, from the first phone that says
+      if (entry['founder'] == true && !member.founder && !_localMembers.values.any((m) => m.founder)) {
+        member.founder = true;
+        familyChanged = true;
+      }
+
+      // What the admin allowed them: only the admin's signed word counts
+      final perm = asMap(entry['perm']);
+      if (perm['sig'] is String && newer(perm['at'], member.permAt) && !member.founder) {
+        final rights = _rightsFromJson(perm['rights']) ?? const <int, List<String>>{};
+        if (await _permIsFromAdmin(id, (perm['at'] as num).toInt(), rights, perm['sig'] as String)) {
+          member.rights = rights;
+          member.permAt = (perm['at'] as num).toInt();
+          member.permSig = perm['sig'] as String;
+          familyChanged = true;
+        }
+      }
+    }
+
+    // The family changing hands (its admin leaving): only the old admin's signature counts
+    var becameAdmin = false;
+    final handOver = asMap(delta['owner']);
+    if (handOver['sig'] is String && handOver['to'] is String && newer(handOver['at'], _ownerAt)) {
+      final oldAdmin = _localMembers.values.where((m) => m.founder).firstOrNull;
+      final heir = _localMembers[handOver['to']];
+      final at = (handOver['at'] as num).toInt();
+
+      if (oldAdmin?.key != null && heir != null && await LocalFamilyCrypto.verify(oldAdmin!.key!, _ownerMessage(heir.id, at), handOver['sig'] as String)) {
+        oldAdmin.founder = false;
+        heir.founder = true;
+        _ownerTo = heir.id;
+        _ownerAt = at;
+        _ownerSig = handOver['sig'] as String;
+        familyChanged = true;
+        becameAdmin = heir.id == _localMyId;
+      }
+    }
 
     for (final entry in (delta['gone'] as List? ?? const []).cast<Map<String, dynamic>>()) {
       final uuid = entry['uuid'] as String?;
@@ -1213,7 +1582,10 @@ class Repository extends ChangeNotifier {
           familyChanged = _localMembers.remove(id) != null || familyChanged;
         case 'list':
           final list = _lists[uuid];
-          _remember(uuid, list: true, type: list?.listTypeId ?? localTypeId, at: at);
+          final type = list?.listTypeId ?? (entry['type'] as num?)?.toInt() ?? localTypeId;
+          if (!can(type, Ability.manageLists)) continue;
+
+          _remember(uuid, list: true, type: type, at: at);
           if (list == null) continue;
 
           _lists.remove(uuid);
@@ -1225,6 +1597,8 @@ class Repository extends ChangeNotifier {
         default:
           final listUuid = entry['list'] as String?;
           final item = listUuid == null ? null : _item(listUuid, uuid);
+          final type = listUuid == null ? null : _lists[listUuid]?.listTypeId;
+          if (type != null && !can(type, Ability.editItems)) continue;
 
           // What is in the cart is about to be bought: it stays, here
           if (item != null && item.status == ItemStatus.inCart) continue;
@@ -1262,48 +1636,44 @@ class Repository extends ChangeNotifier {
       }
     }
 
-    for (final entry in (delta['members'] as List? ?? const []).cast<Map<String, dynamic>>()) {
-      final id = entry['id'] as String?;
-      final name = (entry['name'] as String?)?.trim();
-      if (id == null || name == null || name.isEmpty || _tombstones.containsKey('member:$id')) continue;
-
-      final existing = _localMembers[id];
-      if (existing == null) {
-        _localMembers[id] = LocalMember(
-          id: id,
-          name: name,
-          nameAt: (entry['at'] as num?)?.toInt() ?? nowMs(),
-          joinedAt: (entry['joined'] as num?)?.toInt() ?? nowMs(),
-        );
-        familyChanged = true;
-      } else if (newer(entry['at'], existing.nameAt)) {
-        // (what others say of this phone's own person is theirs to say only when newer than what it said itself)
-        existing.name = name;
-        existing.nameAt = (entry['at'] as num).toInt();
-        familyChanged = true;
-      }
-    }
-
     for (final entry in (delta['lists'] as List? ?? const []).cast<Map<String, dynamic>>()) {
       final uuid = entry['uuid'] as String?;
       final name = (entry['name'] as String?)?.trim();
       if (uuid == null || name == null || name.isEmpty || _tombstones.containsKey(uuid)) continue;
 
+      final hidden = [for (final n in (entry['hidden'] as List? ?? const [])) (n as num).toInt()];
       final existing = _lists[uuid];
+
       if (existing == null) {
         final type = (entry['type'] as num?)?.toInt();
+        final typeId = type != null && _localTypes.containsKey(type) ? type : localTypeId;
+        if (!can(typeId, Ability.manageLists)) continue;
+        if (myNumber != null && hidden.contains(myNumber)) continue; // not for this phone's person
+
         final created = ShoppingListRecord(
           uuid: uuid,
           name: name,
           nameChangedAt: (entry['name_at'] as num?)?.toInt() ?? nowMs(),
-          listTypeId: type != null && _localTypes.containsKey(type) ? type : localTypeId,
+          listTypeId: typeId,
+          hiddenFrom: hidden,
         );
         _lists[uuid] = created;
         saveLists.add(created);
         applied.lists++;
         applied.added.add(name);
-      } else if (newer(entry['name_at'], existing.nameChangedAt)) {
+      } else if (newer(entry['name_at'], existing.nameChangedAt) && can(existing.listTypeId, Ability.manageLists)) {
+        if (myNumber != null && hidden.contains(myNumber)) {
+          // it was hidden from this phone's person: it is not theirs to hold any more
+          _lists.remove(uuid);
+          removeLists.add(uuid);
+          for (final item in existing.items) {
+            removeItems.add(item.uuid);
+          }
+          continue;
+        }
+
         existing.name = name;
+        existing.hiddenFrom = hidden;
         existing.nameChangedAt = (entry['name_at'] as num).toInt();
         saveLists.add(existing);
         applied.lists++;
@@ -1316,8 +1686,15 @@ class Repository extends ChangeNotifier {
       final name = (entry['name'] as String?)?.trim();
       if (uuid == null || list == null || name == null || name.isEmpty || _tombstones.containsKey(uuid)) continue;
 
+      final type = list.listTypeId;
       final existing = _item(list.uuid, uuid);
+
       if (existing == null) {
+        if (!can(type, Ability.addItems)) continue;
+
+        // Moving through the cart needs its own right: without it an item is simply added
+        final status = can(type, Ability.changeStatus) ? ItemStatus.fromCode(entry['status'] as String? ?? 'to_buy') : ItemStatus.toBuy;
+
         final created = ItemRecord(
           uuid: uuid,
           listUuid: list.uuid,
@@ -1325,7 +1702,7 @@ class Repository extends ChangeNotifier {
           nameChangedAt: (entry['name_at'] as num?)?.toInt() ?? nowMs(),
           quantity: ((entry['quantity'] as num?)?.toInt() ?? 1).clamp(1, 9999),
           quantityChangedAt: (entry['quantity_at'] as num?)?.toInt() ?? nowMs(),
-          status: ItemStatus.fromCode(entry['status'] as String? ?? 'to_buy'),
+          status: status,
           statusChangedAt: (entry['status_at'] as num?)?.toInt() ?? nowMs(),
         );
         list.items.add(created);
@@ -1336,17 +1713,17 @@ class Repository extends ChangeNotifier {
       }
 
       var changed = false;
-      if (newer(entry['name_at'], existing.nameChangedAt)) {
+      if (can(type, Ability.editItems) && newer(entry['name_at'], existing.nameChangedAt)) {
         existing.name = name;
         existing.nameChangedAt = (entry['name_at'] as num).toInt();
         changed = true;
       }
-      if (entry['quantity'] is num && newer(entry['quantity_at'], existing.quantityChangedAt)) {
+      if (can(type, Ability.editItems) && entry['quantity'] is num && newer(entry['quantity_at'], existing.quantityChangedAt)) {
         existing.quantity = (entry['quantity'] as num).toInt().clamp(1, 9999);
         existing.quantityChangedAt = (entry['quantity_at'] as num).toInt();
         changed = true;
       }
-      if (entry['status'] is String && newer(entry['status_at'], existing.statusChangedAt)) {
+      if (can(type, Ability.changeStatus) && entry['status'] is String && newer(entry['status_at'], existing.statusChangedAt)) {
         existing.status = ItemStatus.fromCode(entry['status'] as String);
         existing.statusChangedAt = (entry['status_at'] as num).toInt();
         changed = true;
@@ -1357,6 +1734,7 @@ class Repository extends ChangeNotifier {
       }
     }
 
+    if (becameAdmin) await _signRightsAgain();
     if (familyChanged) await _saveLocalState();
 
     if (applied.total > 0 || familyChanged || removeLists.isNotEmpty || removeItems.isNotEmpty) {
@@ -1378,6 +1756,9 @@ class Repository extends ChangeNotifier {
     _localMembers.clear();
     _localMyId = '';
     _familyName = '';
+    _ownerTo = null;
+    _ownerAt = 0;
+    _ownerSig = null;
     await _db.wipe();
     notifyListeners();
   }

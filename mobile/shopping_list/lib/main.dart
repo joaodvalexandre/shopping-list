@@ -51,6 +51,8 @@ Future<void> main() async {
 
   // Phones of the family nearby: who this phone is, and the signed credential that proves it
   final identity = PeerIdentity(secrets: const SecureSecretStore(), store: db);
+  // A local family proves who is who with this phone's key
+  await repository.attachSigner(localSignerFor(identity));
   final sync = SyncService(
     api: api,
     repository: repository,
@@ -144,6 +146,18 @@ void openListFromNotification(String listUuid, Repository repository, AuthState 
   navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: listUuid)));
 }
 
+/// Moving between pages closes the keyboard, so the back button goes back a page instead of
+/// closing a keyboard that belongs to the page just left.
+class _UnfocusObserver extends NavigatorObserver {
+  void _unfocus() => FocusManager.instance.primaryFocus?.unfocus();
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _unfocus();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _unfocus();
+}
+
 class ShoppingListApp extends StatelessWidget {
   const ShoppingListApp({super.key});
 
@@ -153,6 +167,7 @@ class ShoppingListApp extends StatelessWidget {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
+      navigatorObservers: [_UnfocusObserver()],
       title: 'Cestou',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),

@@ -163,28 +163,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
   }
 
   /// The web's two pills: the current one dark, the other light.
-  Widget _tab(String label, bool selected, VoidCallback onTap) {
-    final dark = context.isDark;
-
-    return Material(
-      color: selected ? (dark ? Tw.gray200 : Tw.gray800) : (dark ? Tw.gray700 : Tw.gray200),
-      shape: const StadiumBorder(),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: selected ? (dark ? Tw.gray800 : Colors.white) : (dark ? Tw.gray200 : Tw.gray800),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _tab(String label, bool selected, VoidCallback onTap) => FamilyTabPill(label: label, selected: selected, onTap: onTap);
 
   Widget _memberCard(BuildContext context, FamilyMember member) {
     final dark = context.isDark;

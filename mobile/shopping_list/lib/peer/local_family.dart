@@ -5,6 +5,8 @@ import 'package:cryptography/cryptography.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local_db.dart';
+import '../data/repository.dart' show LocalSigner;
+import 'identity.dart';
 
 /// A family that exists only on its phones: never created on the server, never talked about
 /// to it. What makes phones one family is a connect code that is told from one person to another.
@@ -155,3 +157,28 @@ class LocalFamilyInvite {
     return code == null ? null : LocalFamilyInvite(code: code);
   }
 }
+
+/// Signatures in a local family: the admin's word on what others may do, and each phone's proof of who it is.
+class LocalFamilyCrypto {
+  static final _ed25519 = Ed25519();
+
+  static Future<bool> verify(String publicKey, String message, String signature) async {
+    try {
+      return await _ed25519.verify(
+        utf8.encode(message),
+        signature: Signature(base64.decode(signature), publicKey: SimplePublicKey(base64.decode(publicKey), type: KeyPairType.ed25519)),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// What a phone signs to show, on a connection, that it holds the key of the person it says it is.
+  static String memberChallenge(String signerNonce, String otherNonce) => 'cestou-local-member-v1|$signerNonce|$otherNonce';
+}
+
+/// This phone's key (the one its credential for server families also uses), as the family's signer.
+LocalSigner localSignerFor(PeerIdentity identity) => LocalSigner(
+      publicKey: () async => base64.encode(await identity.publicKey()),
+      sign: (message) async => base64.encode(await identity.sign(utf8.encode(message))),
+    );

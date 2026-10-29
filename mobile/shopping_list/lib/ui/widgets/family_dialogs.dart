@@ -45,59 +45,79 @@ Future<void> showTemporaryPassword(BuildContext context, {required String name, 
   );
 }
 
-/// Ask for a single name (a list type's). Returns it once the server accepted it, else null.
-/// [save] does the request; a refusal (a name already used...) is shown under the field.
+/// Ask for a single name (a list type's, a person's...). Returns true once [save] went through.
+/// A refusal from the server (a name already used...) is shown under the field.
 Future<bool> askListTypeName(BuildContext context, {required String title, String initial = '', required Future<void> Function(String name) save}) async {
-  final controller = TextEditingController(text: initial);
-  String? error;
-  var saving = false;
-
   final saved = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) {
-        Future<void> submit() async {
-          final name = controller.text.trim();
-          if (name.isEmpty || name.length > 100) {
-            setState(() => error = context.rt('app_required'));
-            return;
-          }
-
-          setState(() {
-            saving = true;
-            error = null;
-          });
-
-          try {
-            await save(name);
-            if (context.mounted) Navigator.pop(context, true);
-          } on ApiException catch (e) {
-            if (!context.mounted) return;
-            setState(() {
-              saving = false;
-              error = e.isOffline ? context.rt('app_cannot_reach') : e.firstMessage('name');
-            });
-          }
-        }
-
-        return AlertDialog(
-          title: Text(title),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => submit(),
-            decoration: InputDecoration(labelText: context.t('name'), errorText: error, isDense: true),
-          ),
-          actions: [
-            TextButton(onPressed: saving ? null : () => Navigator.pop(dialogContext, false), child: Text(context.t('go_back'))),
-            FilledButton(onPressed: saving ? null : submit, child: Text(context.t('save').toUpperCase())),
-          ],
-        );
-      },
-    ),
+    builder: (_) => _NameDialog(title: title, initial: initial, save: save),
   );
 
-  controller.dispose();
   return saved ?? false;
+}
+
+/// The dialog is a widget of its own so that its text controller lives exactly as long as it does.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.title, required this.initial, required this.save});
+
+  final String title;
+  final String initial;
+  final Future<void> Function(String name) save;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _controller = TextEditingController(text: widget.initial);
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty || name.length > 100) {
+      setState(() => _error = context.rt('app_required'));
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      await widget.save(name);
+      if (mounted) Navigator.pop(context, true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.isOffline ? context.rt('app_cannot_reach') : e.firstMessage('name');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(labelText: context.t('name'), errorText: _error, isDense: true),
+      ),
+      actions: [
+        TextButton(onPressed: _saving ? null : () => Navigator.pop(context, false), child: Text(context.t('go_back'))),
+        FilledButton(onPressed: _saving ? null : _submit, child: Text(context.t('save').toUpperCase())),
+      ],
+    );
+  }
 }
