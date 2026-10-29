@@ -16,8 +16,16 @@ import 'support/peer_support.dart';
 /// The air between phones: radios in range of each other find and call each other.
 class FakeAir {
   final radios = <FakeRadio>[];
+  final _outOfReach = <String>{};
 
   FakeRadio? byId(String id) => radios.where((r) => r.id == id).firstOrNull;
+
+  /// Two phones too far apart to see each other.
+  void separate(String a, String b) => _outOfReach.add(_pair(a, b));
+
+  bool inReach(String a, String b) => !_outOfReach.contains(_pair(a, b));
+
+  static String _pair(String a, String b) => a.compareTo(b) < 0 ? '$a|$b' : '$b|$a';
 }
 
 class FakeRadio implements NearbyRadio {
@@ -49,7 +57,7 @@ class FakeRadio implements NearbyRadio {
     this.events = events;
     started = true;
 
-    for (final other in air.radios.where((r) => r != this && r.started)) {
+    for (final other in air.radios.where((r) => r != this && r.started && air.inReach(id, r.id))) {
       _later(() => events.found(other.id, other.name));
       _later(() => other.events?.found(id, name));
     }
@@ -68,7 +76,7 @@ class FakeRadio implements NearbyRadio {
   Future<void> connect(String endpointId, {required String name}) async {
     calledTo.add(endpointId);
     final other = air.byId(endpointId);
-    if (other == null || !other.started || stalls) return;
+    if (other == null || !other.started || stalls || !air.inReach(id, endpointId)) return;
 
     _later(() {
       events?.initiated(endpointId, other.name);
@@ -246,7 +254,7 @@ void main() {
     expect(ana.radio.calledTo.length + rui.radio.calledTo.length, connections);
   });
 
-  test('connected phones let go when another phone of the family needs its turn, and meet again later', () async {
+  test('a third phone of the family joins two that are connected, and nobody has to let go', () async {
     final ana = await phoneWithService('aaaa', 2, 'Ana');
     final rui = await phoneWithService('bbbb', 3, 'Rui');
     ana.service.setForeground(true);
@@ -553,6 +561,47 @@ void main() {
       keeping.setForeground(false);
       await until(() => ana.radio.started);
       keeping.dispose();
+    });
+
+    test('phones of a family all stay connected to each other, with nobody waiting for a turn', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final code = (await ana.service.localFamily!.current())!.code;
+      final bia = await localPhone('bbbb', 'Bia', code: code);
+      final cai = await localPhone('cccc', 'Cai', code: code);
+
+      for (final phone in [ana, bia, cai]) {
+        phone.service.setForeground(true);
+      }
+
+      await until(() => ana.service.linkCount == 2 && bia.service.linkCount == 2 && cai.service.linkCount == 2);
+      await until(() => ana.service.connectedMemberIds.length == 2); // (who they are is known after the first round)
+      expect(ana.service.connectedMemberIds, {bia.repo.localMyId, cai.repo.localMyId});
+
+      // and what one does reaches both, over the connections already there
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      await until(() => bia.repo.list(shop.uuid) != null && cai.repo.list(shop.uuid) != null);
+    });
+
+    test('a change reaches a phone out of reach by passing through the one in between', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final code = (await ana.service.localFamily!.current())!.code;
+      final bia = await localPhone('bbbb', 'Bia', code: code);
+      final cai = await localPhone('cccc', 'Cai', code: code);
+      air.separate('ep-aaaa', 'ep-cccc'); // Ana and Cai are too far apart; Bia is within reach of both
+
+      for (final phone in [ana, bia, cai]) {
+        phone.service.setForeground(true);
+      }
+      await until(() => bia.service.linkCount == 2 && ana.service.linkCount == 1 && cai.service.linkCount == 1);
+
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 1);
+
+      await until(() => cai.repo.list(shop.uuid) != null && cai.repo.itemsOf(shop.uuid).length == 1);
+
+      // and back the other way
+      cai.repo.addItem(shop.uuid, name: 'Eggs', quantity: 6);
+      await until(() => ana.repo.itemsOf(shop.uuid).any((i) => i.name == 'Eggs'));
     });
 
     test('a phone with another code is not even connected to', () async {

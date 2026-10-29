@@ -28,6 +28,13 @@ class FamilyLinkService : Service() {
         super.onDestroy()
     }
 
+    /** The app was swiped away from the recent apps: the connection went with it, so the notification should not stay. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     /** New words for the notification, while the service runs (no need to start anything again). */
     fun refresh(title: String, text: String) {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, build(title, text))

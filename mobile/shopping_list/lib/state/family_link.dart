@@ -61,6 +61,13 @@ class FamilyLink {
     await _call('start', {'title': title, 'text': text});
   }
 
+  /// Is the app allowed to run in the background without being stopped to save battery? (Android only.)
+  Future<bool> batteryExempt() async => await _call('batteryExempt') == true;
+
+  /// Open Android's question: let the app run in the background. Said "no" to, the phone may stop
+  /// the app when the screen is off, and the family's phones lose each other.
+  Future<void> askBatteryExemption() => _call('askBatteryExemption');
+
   Future<Object?> _call(String method, [Map<String, String>? arguments]) async {
     if (!Platform.isAndroid) return null;
 

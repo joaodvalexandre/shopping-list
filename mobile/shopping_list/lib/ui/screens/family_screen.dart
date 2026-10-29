@@ -7,6 +7,7 @@ import '../../data/repository.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/family_cards.dart';
 import '../widgets/family_dialogs.dart';
 import 'member_form_screen.dart';
 
@@ -167,90 +168,59 @@ class _FamilyScreenState extends State<FamilyScreen> {
 
   Widget _memberCard(BuildContext context, FamilyMember member) {
     final dark = context.isDark;
-    final muted = dark ? Tw.gray400 : Tw.gray500;
     final own = member.id == context.read<Repository>().me?.userId;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(own ? '${member.name}  (${context.t('app_you')})' : member.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 2),
-            Text(member.email, style: TextStyle(fontSize: 13, color: muted), overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                StatusPill(text: context.t(member.isAdmin ? 'role_admin' : 'role_member'), color: member.isAdmin ? Tw.purple500 : Tw.blue500),
-                StatusPill(text: context.t(member.mustChangePassword ? 'pending_first_login' : 'active'), color: member.mustChangePassword ? Tw.yellow500 : Tw.green500),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: context.t('edit'),
-                  icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
-                  onPressed: () => _openMemberForm(member: member),
-                ),
-                IconButton(
-                  tooltip: context.t('reset_password'),
-                  icon: Icon(Icons.lock_reset, color: dark ? Tw.blue500 : Tw.blue600),
-                  onPressed: () => _resetPassword(member),
-                ),
-                // Nobody removes their own account (the server refuses it too)
-                if (!own)
-                  IconButton(
-                    tooltip: context.t('delete'),
-                    icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
-                    onPressed: () => _deleteMember(member),
-                  ),
-              ],
-            ),
-          ],
+    return FamilyMemberCard(
+      name: member.name,
+      own: own,
+      subtitle: member.email,
+      pills: [
+        StatusPill(text: context.t(member.isAdmin ? 'role_admin' : 'role_member'), color: member.isAdmin ? Tw.purple500 : Tw.blue500),
+        StatusPill(text: context.t(member.mustChangePassword ? 'pending_first_login' : 'active'), color: member.mustChangePassword ? Tw.yellow500 : Tw.green500),
+      ],
+      actions: [
+        IconButton(
+          tooltip: context.t('edit'),
+          icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
+          onPressed: () => _openMemberForm(member: member),
         ),
-      ),
+        IconButton(
+          tooltip: context.t('reset_password'),
+          icon: Icon(Icons.lock_reset, color: dark ? Tw.blue500 : Tw.blue600),
+          onPressed: () => _resetPassword(member),
+        ),
+        // Nobody removes their own account (the server refuses it too)
+        if (!own)
+          IconButton(
+            tooltip: context.t('delete'),
+            icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
+            onPressed: () => _deleteMember(member),
+          ),
+      ],
     );
   }
 
   Widget _typeCard(BuildContext context, FamilyListType type) {
     final dark = context.isDark;
-    final muted = dark ? Tw.gray400 : Tw.gray500;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(type.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  Text('${context.t('lists')}: ${type.listsCount}', style: TextStyle(fontSize: 13, color: muted)),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: context.t('edit'),
-              icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
-              onPressed: () => _typeDialog(type: type),
-            ),
-            // A type that still has lists cannot go: the same rule as on the web
-            if (type.listsCount == 0)
-              IconButton(
-                tooltip: context.t('delete'),
-                icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
-                onPressed: () => _deleteType(type),
-              )
-            else
-              Padding(padding: const EdgeInsets.only(right: 12), child: Text(context.t('app_type_in_use'), style: TextStyle(fontSize: 12, color: muted))),
-          ],
+    return FamilyTypeCard(
+      name: type.name,
+      listsCount: type.listsCount,
+      actions: [
+        IconButton(
+          tooltip: context.t('edit'),
+          icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
+          onPressed: () => _typeDialog(type: type),
         ),
-      ),
+        // A type that still has lists cannot go: the same rule as on the web
+        if (type.listsCount == 0)
+          IconButton(
+            tooltip: context.t('delete'),
+            icon: Icon(Icons.delete_outline, color: dark ? Tw.red400 : Tw.red600),
+            onPressed: () => _deleteType(type),
+          ),
+      ],
+      note: type.listsCount == 0 ? null : context.t('app_type_in_use'),
     );
   }
 }

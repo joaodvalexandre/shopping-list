@@ -7,9 +7,11 @@ import '../../data/repository.dart';
 import '../../peer/nearby_service.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/top_bar.dart';
 
-/// One person of an offline family: who they are, what they may do in each list type, and which
-/// lists are hidden from them (for surprises). The admin changes these; everyone else sees them.
+/// One person of an offline family, laid out like the member form of a server family: who they are,
+/// their role (admin or member) and what they may do in each list type. An admin changes these;
+/// everyone else sees them. Below, which lists are hidden from them (for surprises).
 class LocalMemberScreen extends StatefulWidget {
   const LocalMemberScreen({super.key, required this.memberId});
 
@@ -21,6 +23,7 @@ class LocalMemberScreen extends StatefulWidget {
 
 class _LocalMemberScreenState extends State<LocalMemberScreen> {
   Map<int, Map<Ability, bool>>? _rights;
+  bool _admin = false;
   bool _changed = false;
   bool _saving = false;
 
@@ -43,7 +46,7 @@ class _LocalMemberScreenState extends State<LocalMemberScreen> {
 
   Future<void> _save(Repository repository) async {
     setState(() => _saving = true);
-    final saved = await repository.setLocalRights(widget.memberId, _rights!);
+    final saved = await repository.setLocalAccess(widget.memberId, admin: _admin, rights: _rights!);
 
     if (!mounted) return;
     setState(() {
@@ -57,90 +60,110 @@ class _LocalMemberScreenState extends State<LocalMemberScreen> {
   Widget build(BuildContext context) {
     final repository = context.watch<Repository>();
     final nearby = context.watch<NearbyService>();
-    final muted = context.isDark ? Tw.gray400 : Tw.gray500;
+    final dark = context.isDark;
+    final muted = dark ? Tw.gray400 : Tw.gray500;
 
     final member = repository.localMembers.where((m) => m.id == widget.memberId).firstOrNull;
     if (member == null) {
       return Scaffold(appBar: AppBar(), body: Center(child: Text(context.t('app_family_not_met'))));
     }
 
-    final isMe = member.id == repository.localMyId;
-    final editable = repository.isLocalAdmin && !member.founder && !isMe;
+    final own = member.id == repository.localMyId;
+    final editable = repository.isLocalAdmin && !member.founder && !own;
 
-    // what is shown is what the admin set, until the admin starts changing it here
-    _rights ??= repository.localRightsOf(member.id).map((typeId, abilities) => MapEntry(typeId, Map.of(abilities)));
-    if (!_changed && !_saving) {
+    // what is shown is what the family has, until the admin starts changing it here
+    if (_rights == null || (!_changed && !_saving)) {
       _rights = repository.localRightsOf(member.id).map((typeId, abilities) => MapEntry(typeId, Map.of(abilities)));
+      _admin = member.isAdmin;
     }
 
     final types = repository.localTypes;
     final lists = repository.lists;
+    final isAdmin = editable ? _admin : member.isAdmin;
 
     return Scaffold(
-      appBar: AppBar(title: Text(member.name, style: const TextStyle(fontSize: 18))),
+      appBar: AppBar(
+        title: Text(context.t('app_edit_member'), style: const TextStyle(fontSize: 18)),
+        actions: const [ThemeToggle(), SizedBox(width: 12)],
+      ),
       body: ListView(
         padding: scrollPadding,
         children: [
           Panel(
             padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(children: [
-                  Expanded(child: Text(isMe ? '${member.name}  (${context.t('app_family_you')})' : member.name, style: const TextStyle(fontSize: 20))),
-                  StatusPill(
-                    text: context.t(member.founder ? 'role_admin' : 'role_member'),
-                    color: member.founder ? Tw.purple500 : Tw.blue500,
-                  ),
-                ]),
+                // Names belong to the people: each changes their own, on their own phone
+                Text(context.t('name'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
                 const SizedBox(height: 4),
+                Text(member.name, style: const TextStyle(fontSize: 16)),
+                const SizedBox(height: 2),
                 Text(
-                  isMe
-                      ? context.t('app_family_this_phone')
-                      : nearby.connectedMemberId == member.id
+                  own
+                      ? '(${context.t('app_you')})  ·  ${context.t('app_family_this_phone')}'
+                      : nearby.connectedMemberIds.contains(member.id)
                           ? context.t('app_family_connected_now')
                           : member.seenAt != null
                               ? context.t('app_family_seen', {'time': _ago(context, member.seenAt!)})
                               : context.t('app_family_not_met'),
                   style: TextStyle(fontSize: 12, color: muted),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // What they may do
-          Panel(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.t('permissions'), style: const TextStyle(fontSize: 20)),
+                const SizedBox(height: 16),
+                Text(context.t('role'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
                 const SizedBox(height: 4),
-                if (member.founder)
-                  Text(context.t('admin_role_help'), style: TextStyle(fontSize: 12, color: muted))
-                else ...[
+                DropdownButtonFormField<String>(
+                  key: ValueKey('role-${member.id}-$isAdmin-$editable'),
+                  initialValue: isAdmin ? 'admin' : 'member',
+                  isExpanded: true,
+                  decoration: const InputDecoration(isDense: true),
+                  items: [
+                    DropdownMenuItem(value: 'member', child: Text(context.t('role_member'))),
+                    DropdownMenuItem(value: 'admin', child: Text(context.t('role_admin'))),
+                  ],
+                  onChanged: !editable
+                      ? null
+                      : (role) => setState(() {
+                            _admin = role == 'admin';
+                            _changed = true;
+                          }),
+                ),
+                if (member.founder) ...[
+                  const SizedBox(height: 4),
+                  Text(context.t('app_member_founder'), style: TextStyle(fontSize: 12, color: muted)),
+                ],
+                if (isAdmin) ...[
+                  const SizedBox(height: 4),
+                  Text(context.t('admin_role_help'), style: TextStyle(fontSize: 12, color: muted)),
+                ] else ...[
+                  const SizedBox(height: 20),
+                  Text(context.t('permissions'), style: const TextStyle(fontSize: 20)),
+                  const SizedBox(height: 4),
                   Text(editable ? context.t('permissions_help') : context.t('app_member_only_admin'), style: TextStyle(fontSize: 12, color: muted)),
                   const SizedBox(height: 12),
                   for (final type in types) _typeRights(context, type, editable),
-                  if (editable) ...[
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton(
+                ],
+                if (editable) ...[
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(), child: Text(context.t('go_back'))),
+                      const SizedBox(width: 8),
+                      FilledButton(
                         onPressed: _saving || !_changed ? null : () => _save(repository),
                         child: Text(context.t('save').toUpperCase()),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ],
             ),
           ),
           const SizedBox(height: 12),
 
-          // Which lists are hidden from them (only those they could otherwise see)
-          if (!isMe && !member.founder)
+          // Which lists are hidden from them (only those they could otherwise see); admins see everything
+          if (!own && !isAdmin)
             Panel(
               padding: const EdgeInsets.all(20),
               child: Column(

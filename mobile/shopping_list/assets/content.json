@@ -1,5 +1,5 @@
 {
-    "version": "2ffd18bfe24df30a",
+    "version": "24f88efffaeca8d3",
     "languages": [
         {
             "code": "pt",
@@ -430,7 +430,10 @@
             "app_offline_leave_alone_confirm": "Sair da família? Não há nenhum telemóvel da família por perto para ser avisado, por isso continuarão a listar-te até ser. As listas são removidas deste telemóvel.",
             "app_offline_leave_admin_confirm": "Sair da família? És o administrador, por isso passa para :name, que está nela há mais tempo. As listas são removidas deste telemóvel.",
             "app_offline_leave_admin_needs_phone": "És o administrador da família: tem de estar ligado outro telemóvel da família para a assumir antes de saíres. Liga-te a um (a faixa no topo diz quando está ligado) e tenta outra vez.",
-            "app_offline_leave_not_said": "A passagem não chegou ao outro telemóvel. Tenta outra vez."
+            "app_offline_leave_not_said": "A passagem não chegou ao outro telemóvel. Tenta outra vez.",
+            "app_family_background_help": "Para ficar ligado à família com o ecrã desligado, o Android tem de deixar esta app correr em segundo plano. Sem isso, o telemóvel pode parar a app para poupar bateria.",
+            "app_family_background_allow": "Permitir em segundo plano",
+            "app_member_founder": "Criou a família: é sempre administrador, e ninguém pode mudar isso."
         },
         "en": {
             "pending": "Pending",
@@ -847,7 +850,10 @@
             "app_offline_leave_alone_confirm": "Leave the family? No phone of the family is nearby to be told, so until it is they will still list you. Its lists are removed from this phone.",
             "app_offline_leave_admin_confirm": "Leave the family? You are its admin, so it passes to :name, who has been in it the longest. Its lists are removed from this phone.",
             "app_offline_leave_admin_needs_phone": "You are the family's admin: another phone of the family must be connected to take the family over before you leave. Connect to one (the strip at the top says when it is connected) and try again.",
-            "app_offline_leave_not_said": "The hand-over did not reach the other phone. Try again."
+            "app_offline_leave_not_said": "The hand-over did not reach the other phone. Try again.",
+            "app_family_background_help": "To stay connected to the family with the screen off, Android must let this app run in the background. Without it, the phone may stop the app to save battery.",
+            "app_family_background_allow": "Allow in the background",
+            "app_member_founder": "Started the family: always an admin, and nobody can change that."
         }
     },
     "pages": [

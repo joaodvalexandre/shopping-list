@@ -47,9 +47,11 @@ class LocalMember {
     this.seenAt,
     this.key,
     this.founder = false,
+    this.role = 'member',
     this.rights,
     this.permAt = 0,
     this.permSig,
+    this.permBy,
   });
 
   final String id;
@@ -67,14 +69,22 @@ class LocalMember {
   /// connect, that a phone is who it says.
   String? key;
 
-  /// The person who started the family: its admin, who alone may change what the others can do.
+  /// The person who started the family: always an admin, and one nobody else can change.
   bool founder;
+
+  /// `admin` or `member`, as an admin set it (signed). Admins change what the others may do.
+  String role;
 
   /// What the admin allowed them, per list type (ability names such as `can_view`), signed by the
   /// admin. Null when nothing was set: then they may do everything.
   Map<int, List<String>>? rights;
   int permAt;
   String? permSig;
+
+  /// Which admin signed it.
+  String? permBy;
+
+  bool get isAdmin => founder || role == 'admin';
 }
 
 /// Signs for this phone (the key it proves itself with to the family's other phones).
@@ -1035,9 +1045,11 @@ class Repository extends ChangeNotifier {
         seenAt: (map['seen'] as num?)?.toInt(),
         key: map['key'] as String?,
         founder: map['founder'] == true,
+        role: map['role'] as String? ?? 'member',
         rights: _rightsFromJson(map['rights']),
         permAt: (map['perm_at'] as num?)?.toInt() ?? 0,
         permSig: map['perm_sig'] as String?,
+        permBy: map['perm_by'] as String?,
       );
     });
     _adoptFounderRole(mine);
@@ -1091,9 +1103,11 @@ class Repository extends ChangeNotifier {
               'seen': m.seenAt,
               'key': m.key,
               'founder': m.founder,
+              'role': m.role,
               'rights': _rightsToJson(m.rights),
               'perm_at': m.permAt,
               'perm_sig': m.permSig,
+              'perm_by': m.permBy,
             },
         },
       }),
@@ -1107,7 +1121,7 @@ class Repository extends ChangeNotifier {
     final canManageSomething = _localTypes.keys.any((id) => _memberCan(_localMyId, id, Ability.manageLists));
 
     final json = {
-      'user': {'id': mine?.number ?? 1, 'name': mine?.name ?? '', 'email': '', 'role': mine?.founder == true ? 'admin' : 'member'},
+      'user': {'id': mine?.number ?? 1, 'name': mine?.name ?? '', 'email': '', 'role': mine?.isAdmin == true ? 'admin' : 'member'},
       'family': {'name': _familyName},
       'list_types': [
         for (final e in _localTypes.entries) {'id': e.key, 'name': e.value.name},
@@ -1236,10 +1250,11 @@ class Repository extends ChangeNotifier {
     if (signer == null) return;
 
     for (final member in _localMembers.values) {
-      if (member.rights == null || member.founder) continue;
+      if (member.permSig == null || member.founder) continue;
 
       member.permAt = nowMs() > member.permAt ? nowMs() : member.permAt + 1;
-      member.permSig = await signer.sign(_permMessage(member.id, member.permAt, member.rights!));
+      member.permBy = _localMyId;
+      member.permSig = await signer.sign(_permMessage(member.id, member.permAt, member.role, member.rights ?? const {}));
     }
   }
 
@@ -1284,7 +1299,7 @@ class Repository extends ChangeNotifier {
     }
   }
 
-  bool get isLocalAdmin => _localMembers[_localMyId]?.founder ?? false;
+  bool get isLocalAdmin => _localMembers[_localMyId]?.isAdmin ?? false;
 
   /// The key a person of the family is known by (null: not seen yet).
   String? localMemberKey(String memberId) => _localMembers[memberId]?.key;
@@ -1296,7 +1311,7 @@ class Repository extends ChangeNotifier {
     if (memberId == null) return true;
 
     final member = _localMembers[memberId];
-    if (member == null || member.founder || member.rights == null) return true;
+    if (member == null || member.isAdmin || member.rights == null) return true;
 
     final granted = member.rights![typeId];
     if (granted == null) return false;
@@ -1318,12 +1333,13 @@ class Repository extends ChangeNotifier {
     return _memberCan(memberId, list.listTypeId, Ability.view) && (member == null || !list.hiddenFrom.contains(member.number));
   }
 
-  /// The admin sets what a person may do, per list type. Returns false when it is not allowed
-  /// (not the admin, or the admin themself).
-  Future<bool> setLocalRights(String memberId, Map<int, Map<Ability, bool>> rights) async {
+  /// An admin sets what a person is (admin or member) and what they may do, per list type.
+  /// Returns false when it is not allowed: not an admin, or about the person who started the
+  /// family, or about oneself.
+  Future<bool> setLocalAccess(String memberId, {required bool admin, required Map<int, Map<Ability, bool>> rights}) async {
     final member = _localMembers[memberId];
     final signer = _signer;
-    if (!isLocalAdmin || signer == null || member == null || member.founder) return false;
+    if (!isLocalAdmin || signer == null || member == null || member.founder || memberId == _localMyId) return false;
 
     final normal = <int, List<String>>{};
     rights.forEach((typeId, abilities) {
@@ -1332,23 +1348,32 @@ class Repository extends ChangeNotifier {
     });
 
     final now = nowMs();
+    member.role = admin ? 'admin' : 'member';
     member.rights = normal;
     member.permAt = now > member.permAt ? now : member.permAt + 1;
-    member.permSig = await signer.sign(_permMessage(member.id, member.permAt, normal));
+    member.permBy = _localMyId;
+    member.permSig = await signer.sign(_permMessage(member.id, member.permAt, member.role, normal));
 
     _familyChanged();
     return true;
   }
 
-  /// What the admin signs: who, when, and what they may do, in one fixed spelling.
-  static String _permMessage(String memberId, int at, Map<int, List<String>> rights) {
+  /// What a person may do, with their role as it is.
+  Future<bool> setLocalRights(String memberId, Map<int, Map<Ability, bool>> rights) =>
+      setLocalAccess(memberId, admin: _localMembers[memberId]?.role == 'admin', rights: rights);
+
+  /// What an admin signs: who, when, what they are and what they may do, in one fixed spelling.
+  static String _permMessage(String memberId, int at, String role, Map<int, List<String>> rights) {
     final types = rights.keys.toList()..sort();
-    return 'perm|$memberId|$at|${types.map((t) => '$t:${([...rights[t]!]..sort()).join(',')}').join(';')}';
+    return 'perm|$memberId|$at|$role|${types.map((t) => '$t:${([...rights[t]!]..sort()).join(',')}').join(';')}';
   }
 
-  Future<bool> _permIsFromAdmin(String memberId, int at, Map<int, List<String>> rights, String signature) async {
-    final adminKey = _localMembers.values.where((m) => m.founder && m.key != null).map((m) => m.key!).firstOrNull;
-    return adminKey != null && await LocalFamilyCrypto.verify(adminKey, _permMessage(memberId, at, rights), signature);
+  /// A record is believed when an admin (known to this phone as one) signed it, and not about themselves.
+  Future<bool> _permIsFromAdmin(String memberId, int at, String role, Map<int, List<String>> rights, String? by, String signature) async {
+    final signer = by == null ? null : _localMembers[by];
+    if (signer == null || by == memberId || !signer.isAdmin || signer.key == null) return false;
+
+    return LocalFamilyCrypto.verify(signer.key!, _permMessage(memberId, at, role, rights), signature);
   }
 
   // ------------------------------------------------------------ sync (local)
@@ -1404,7 +1429,7 @@ class Repository extends ChangeNotifier {
           'joined': m.joinedAt,
           'key': m.key,
           'founder': m.founder,
-          if (m.permSig != null) 'perm': {'at': m.permAt, 'rights': _rightsToJson(m.rights), 'sig': m.permSig},
+          if (m.permSig != null) 'perm': {'at': m.permAt, 'role': m.role, 'by': m.permBy, 'rights': _rightsToJson(m.rights), 'sig': m.permSig},
         });
       }
     }
@@ -1499,6 +1524,8 @@ class Repository extends ChangeNotifier {
     bool can(int typeId, Ability ability) => _memberCan(peerId, typeId, ability);
     final myNumber = _localMembers[_localMyId]?.number;
 
+    final records = <({LocalMember member, Map<String, dynamic> perm})>[];
+
     for (final entry in (delta['members'] as List? ?? const []).cast<Map<String, dynamic>>()) {
       final id = entry['id'] as String?;
       final name = (entry['name'] as String?)?.trim();
@@ -1531,15 +1558,39 @@ class Repository extends ChangeNotifier {
         familyChanged = true;
       }
 
-      // What the admin allowed them: only the admin's signed word counts
+      // What an admin set for them: believed later, once it is known who is an admin
       final perm = asMap(entry['perm']);
-      if (perm['sig'] is String && newer(perm['at'], member.permAt) && !member.founder) {
+      if (perm['sig'] is String) records.add((member: member, perm: perm));
+    }
+
+    // Only an admin's signed word counts. An admin made by an admin may vouch for the next, so go
+    // round until nothing more can be believed.
+    var believed = true;
+    while (believed && records.isNotEmpty) {
+      believed = false;
+
+      for (final record in List.of(records)) {
+        final member = record.member;
+        final perm = record.perm;
+        final at = (perm['at'] as num?)?.toInt() ?? 0;
+
+        if (member.founder || at <= member.permAt) {
+          records.remove(record);
+          continue;
+        }
+
+        final role = perm['role'] == 'admin' ? 'admin' : 'member';
         final rights = _rightsFromJson(perm['rights']) ?? const <int, List<String>>{};
-        if (await _permIsFromAdmin(id, (perm['at'] as num).toInt(), rights, perm['sig'] as String)) {
+
+        if (await _permIsFromAdmin(member.id, at, role, rights, perm['by'] as String?, perm['sig'] as String)) {
+          member.role = role;
           member.rights = rights;
-          member.permAt = (perm['at'] as num).toInt();
+          member.permAt = at;
+          member.permBy = perm['by'] as String?;
           member.permSig = perm['sig'] as String;
+          records.remove(record);
           familyChanged = true;
+          believed = true;
         }
       }
     }
@@ -1735,7 +1786,10 @@ class Repository extends ChangeNotifier {
     }
 
     if (becameAdmin) await _signRightsAgain();
-    if (familyChanged) await _saveLocalState();
+    if (familyChanged) {
+      applied.family = true;
+      await _saveLocalState();
+    }
 
     if (applied.total > 0 || familyChanged || removeLists.isNotEmpty || removeItems.isNotEmpty) {
       _revision++;

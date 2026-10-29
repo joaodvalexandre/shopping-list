@@ -20,6 +20,8 @@
     <!-- A local family keeps its phones connected while the phone is locked, with a notification that stays -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Asked for once, so Android does not stop the app to save battery while it keeps the family connected -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Scanning a family's QR code to join it (the camera is optional: a code can be typed) -->
     <uses-permission android:name="android.permission.CAMERA" />

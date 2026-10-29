@@ -1,6 +1,9 @@
 package app.cestou.mobile
 
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -32,6 +35,28 @@ class MainActivity : FlutterActivity() {
                 "stop" -> {
                     stopService(Intent(this, FamilyLinkService::class.java))
                     result.success(true)
+                }
+                // Is the app allowed to go on running in the background (not stopped to save battery)?
+                "batteryExempt" -> {
+                    val power = getSystemService(POWER_SERVICE) as PowerManager
+                    result.success(power.isIgnoringBatteryOptimizations(packageName))
+                }
+                "askBatteryExemption" -> {
+                    try {
+                        startActivity(
+                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                .setData(Uri.parse("package:$packageName")),
+                        )
+                        result.success(true)
+                    } catch (e: Exception) {
+                        // some phones have no such screen: the app's own settings page instead
+                        try {
+                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            result.success(false)
+                        }
+                    }
                 }
                 else -> result.notImplemented()
             }

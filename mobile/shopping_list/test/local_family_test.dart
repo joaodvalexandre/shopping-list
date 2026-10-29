@@ -447,7 +447,7 @@ void main() {
 
       // Bia writes herself a record with all the rights, signed with her own key
       const at = 9999999999999;
-      final message = 'perm|$biaId|$at|${Repository.localTypeId}:can_add_items,can_change_status,can_edit_items,can_manage_lists,can_view';
+      final message = 'perm|$biaId|$at|admin|${Repository.localTypeId}:can_add_items,can_change_status,can_edit_items,can_manage_lists,can_view';
       final forged = {
         'lists': const [],
         'items': const [],
@@ -462,6 +462,8 @@ void main() {
             'joined': 1,
             'perm': {
               'at': at,
+              'role': 'admin',
+              'by': biaId,
               'rights': {'${Repository.localTypeId}': ['can_view', 'can_add_items', 'can_edit_items', 'can_change_status', 'can_manage_lists']},
               'sig': await bia.repo.localSigner!.sign(message),
             },
@@ -471,6 +473,7 @@ void main() {
 
       await ana.repo.applyLocalDelta(forged);
       expect(ana.repo.localRightsOf(biaId)[Repository.localTypeId]![Ability.editItems], isFalse);
+      expect(ana.repo.localMembers.firstWhere((m) => m.id == biaId).isAdmin, isFalse);
     });
 
     test('a list hidden from someone is never sent to them, and goes from them when hidden later', () async {
@@ -523,6 +526,84 @@ void main() {
       expect(forAna.ok, isFalse);
       expect(forImpostor.ok, isFalse);
       expect(forAna.status, PeerStatus.invalidCredential);
+    });
+  });
+
+  group('roles', () {
+    test('an admin makes someone an admin, and they can then set what the others may do', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+      await meetLocal(bia, cai);
+
+      expect(bia.repo.isLocalAdmin, isFalse);
+      expect(await ana.repo.setLocalAccess(bia.repo.localMyId, admin: true, rights: const {}), isTrue);
+      await meetLocal(ana, bia);
+
+      expect(bia.repo.isLocalAdmin, isTrue);
+      expect(bia.repo.me!.isAdmin, isTrue);
+      expect(bia.repo.localMembers.firstWhere((m) => m.name == 'Bia').isAdmin, isTrue);
+
+      // Bia, now an admin, restricts Cai; Cai, who has only met Bia since, believes her
+      expect(await bia.repo.setLocalRights(cai.repo.localMyId, {
+        Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view},
+      }), isTrue);
+      await meetLocal(bia, cai);
+
+      expect(cai.repo.me!.can(Repository.localTypeId, Ability.addItems), isFalse);
+      expect(cai.repo.localMembers.firstWhere((m) => m.name == 'Bia').isAdmin, isTrue);
+    });
+
+    test('an admin can be made an ordinary member again, and then their word counts for nothing', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await meetLocal(ana, cai);
+
+      await ana.repo.setLocalAccess(bia.repo.localMyId, admin: true, rights: const {});
+      await meetLocal(ana, bia);
+      expect(bia.repo.isLocalAdmin, isTrue);
+
+      await ana.repo.setLocalAccess(bia.repo.localMyId, admin: false, rights: const {});
+      await meetLocal(ana, bia);
+      expect(bia.repo.isLocalAdmin, isFalse);
+      expect(bia.repo.me!.canCreateLists, isFalse); // an ordinary member with nothing set: nothing
+
+      // what Bia signs now is nobody's word
+      expect(await bia.repo.setLocalRights(cai.repo.localMyId, const {}), isFalse);
+    });
+
+    test('nobody can change the person who started the family, or their own role', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia);
+      await ana.repo.setLocalAccess(bia.repo.localMyId, admin: true, rights: const {});
+      await meetLocal(ana, bia);
+
+      expect(await bia.repo.setLocalAccess(ana.repo.localMyId, admin: false, rights: const {}), isFalse);
+      expect(await bia.repo.setLocalAccess(bia.repo.localMyId, admin: false, rights: const {}), isFalse);
+      expect(await ana.repo.setLocalAccess(ana.repo.localMyId, admin: false, rights: const {}), isFalse);
+    });
+
+    test('an admin has every right, whatever was set for them before', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia);
+
+      await ana.repo.setLocalAccess(bia.repo.localMyId, admin: false, rights: {
+        Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view},
+      });
+      await meetLocal(ana, bia);
+      expect(bia.repo.me!.can(Repository.localTypeId, Ability.manageLists), isFalse);
+
+      await ana.repo.setLocalAccess(bia.repo.localMyId, admin: true, rights: {
+        Repository.localTypeId: {for (final a in Ability.values) a: a == Ability.view},
+      });
+      await meetLocal(ana, bia);
+      expect(bia.repo.me!.can(Repository.localTypeId, Ability.manageLists), isTrue);
     });
   });
 

@@ -431,5 +431,8 @@
     "app_offline_leave_alone_confirm": "Sair da família? Não há nenhum telemóvel da família por perto para ser avisado, por isso continuarão a listar-te até ser. As listas são removidas deste telemóvel.",
     "app_offline_leave_admin_confirm": "Sair da família? És o administrador, por isso passa para :name, que está nela há mais tempo. As listas são removidas deste telemóvel.",
     "app_offline_leave_admin_needs_phone": "És o administrador da família: tem de estar ligado outro telemóvel da família para a assumir antes de saíres. Liga-te a um (a faixa no topo diz quando está ligado) e tenta outra vez.",
-    "app_offline_leave_not_said": "A passagem não chegou ao outro telemóvel. Tenta outra vez."
+    "app_offline_leave_not_said": "A passagem não chegou ao outro telemóvel. Tenta outra vez.",
+    "app_family_background_help": "Para ficar ligado à família com o ecrã desligado, o Android tem de deixar esta app correr em segundo plano. Sem isso, o telemóvel pode parar a app para poupar bateria.",
+    "app_family_background_allow": "Permitir em segundo plano",
+    "app_member_founder": "Criou a família: é sempre administrador, e ninguém pode mudar isso."
 }

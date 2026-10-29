@@ -62,5 +62,11 @@ class PeerApplied {
   /// Names of the items and lists that are new here (a few, for a notification to say).
   final List<String> added = [];
 
+  /// The family itself changed (its people, list types, name or admin): not counted above, but news to pass on.
+  bool family = false;
+
+  /// Anything came in that other phones may not have.
+  bool get changedFamily => total > 0 || family;
+
   int get total => lists + items;
 }
