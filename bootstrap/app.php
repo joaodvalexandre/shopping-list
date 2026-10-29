@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ApiLanguage;
+use App\Http\Middleware\EnsureApiPasswordIsChanged;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\LanguageMiddleware;
 use Illuminate\Foundation\Application;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'password.changed' => EnsurePasswordIsChanged::class,
+            'api.password.changed' => EnsureApiPasswordIsChanged::class,
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
         ]);

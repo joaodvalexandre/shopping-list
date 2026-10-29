@@ -116,6 +116,22 @@ it('forces a change on the web for anyone who signs in with the family name, fla
     $this->get('/dashboard')->assertRedirect(route('password.choose'));
 });
 
+it('signs a phone out when its owner is put on a temporary password after it signed in', function () {
+    $f = makeFamily();
+    $member = User::factory()->create(['family_id' => $f['family']->id]);
+    $token = $member->createToken('Pixel', ['sync'])->plainTextToken;
+
+    $this->withToken($token)->getJson('/api/v1/me')->assertOk();
+
+    $member->update(['must_change_password' => true]);
+
+    app('auth')->forgetGuards();
+    $this->withToken($token)->postJson('/api/v1/sync', [])->assertUnauthorized();
+
+    // the token is gone for good: signing in again goes through the choose-password step
+    expect($member->tokens()->count())->toBe(0);
+});
+
 it('does not force a change on someone who chose their own password', function () {
     $f = makeFamily();
     $f['family']->update(['name' => 'Silva']);

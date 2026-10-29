@@ -12,6 +12,7 @@ import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.connection.AdvertisingOptions;
 import com.google.android.gms.nearby.connection.ConnectionInfo;
 import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback;
+import com.google.android.gms.nearby.connection.ConnectionOptions;
 import com.google.android.gms.nearby.connection.ConnectionResolution;
 import com.google.android.gms.nearby.connection.ConnectionsStatusCodes;
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo;
@@ -169,7 +170,8 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				assert userNickName != null;
 				assert endpointId != null;
 				Nearby.getConnectionsClient(activity)
-						.requestConnection(userNickName, endpointId, discoverConnectionLifecycleCallback)
+						.requestConnection(userNickName, endpointId, discoverConnectionLifecycleCallback,
+								new ConnectionOptions.Builder().setLowPower(true).setDisruptiveUpgrade(false).build())
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
 							public void onSuccess(Void aVoid) {

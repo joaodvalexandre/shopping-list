@@ -33,7 +33,7 @@ Route::prefix('v1')->group(function () {
         Route::put('me/password', [AuthController::class, 'changePassword']);
     });
 
-    Route::middleware(['auth:sanctum', 'abilities:sync'])->group(function () {
+    Route::middleware(['auth:sanctum', 'abilities:sync', 'api.password.changed'])->group(function () {
         Route::get('me', [MeController::class, 'show']);
         Route::get('me/devices', [MeController::class, 'devices']);
         Route::post('me/peer-credential', [PeerCredentialController::class, 'store']);
