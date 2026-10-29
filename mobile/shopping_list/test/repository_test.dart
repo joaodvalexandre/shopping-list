@@ -132,6 +132,18 @@ void main() {
       expect(sent.containsKey('quantity'), isFalse);
     });
 
+    test('an item in the cart cannot be deleted until it is taken out', () async {
+      await repo.applyResponse(response(lists: [serverList('l1', 'Shop')], items: [serverItem('i1', 'l1', 'Milk', status: 'in_cart')], visible: ['l1']), {});
+
+      repo.deleteItem('l1', 'i1');
+      expect(repo.itemsOf('l1').map((i) => i.name), ['Milk']);
+      expect(repo.pendingCount, 0);
+
+      repo.setStatus('l1', 'i1', ItemStatus.toBuy);
+      repo.deleteItem('l1', 'i1');
+      expect(repo.itemsOf('l1'), isEmpty);
+    });
+
     test('finishing a list marks only what is in the cart', () async {
       await repo.applyResponse(
         response(

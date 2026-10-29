@@ -59,6 +59,7 @@
     "list_destroyed_success":   "Shopping list deleted.",
     "item_created_success":     "Item added.",
     "item_destroyed_success":   "Item deleted.",
+    "item_in_cart_cannot_delete": "An item in the cart cannot be deleted. Take it out of the cart first.",
     "item_moved_to_cart_success":     "Item moved to the cart.",
     "item_removed_from_cart_success": "Item removed from the cart.",
     "items_marked_success":     "Items marked as purchased.",
@@ -341,5 +342,6 @@
     "app_sign_out_device_confirm": "Sign this device out?",
     "app_rejected_forbidden":   ":name: you are not allowed to do that, so the change was undone.",
     "app_rejected_not_found":   ":name: it no longer exists or is not available to you.",
+    "app_rejected_in_cart":     ":name: it is in the cart, so it was not deleted.",
     "app_rejected_invalid":     ":name: the server could not accept this change."
 }

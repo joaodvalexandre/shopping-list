@@ -59,6 +59,7 @@
     "list_destroyed_success":   "Lista de compras eliminada.",
     "item_created_success":     "Item adicionado.",
     "item_destroyed_success":   "Item eliminado.",
+    "item_in_cart_cannot_delete": "Um item no carrinho não pode ser eliminado. Tira-o primeiro do carrinho.",
     "item_moved_to_cart_success":     "Item movido para o carrinho.",
     "item_removed_from_cart_success": "Item removido do carrinho.",
     "items_marked_success":     "Items marcados como comprados.",
@@ -341,5 +342,6 @@
     "app_sign_out_device_confirm": "Terminar a sessão neste dispositivo?",
     "app_rejected_forbidden":   ":name: não tens permissão para isso, por isso a alteração foi desfeita.",
     "app_rejected_not_found":   ":name: já não existe ou não está disponível para ti.",
+    "app_rejected_in_cart":     ":name: está no carrinho, por isso não foi eliminado.",
     "app_rejected_invalid":     ":name: o servidor não conseguiu aceitar esta alteração."
 }

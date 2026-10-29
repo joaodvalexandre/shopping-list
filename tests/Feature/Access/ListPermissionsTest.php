@@ -59,6 +59,26 @@ it('lets a member who can edit items edit and delete them', function () {
     expect(Item::find($this->item->id))->toBeNull();
 });
 
+it('does not delete an item that is in the cart, and does not offer to', function () {
+    $member = memberWith($this->f['family'], $this->f['groceries'], ['can_view', 'can_edit_items', 'can_change_status']);
+    $this->actingAs($member);
+
+    $this->post("/shopping_list/add_cart/{$this->item->id}")->assertRedirect();
+    expect($this->item->fresh()->isInCart())->toBeTrue();
+
+    $this->get("/shopping_list/{$this->list->id}")->assertOk()
+        ->assertDontSee(route('shopping_list.destroy_item', ['item_id' => $this->item->id]), false);
+
+    $this->delete("/shopping_list/destroy_item/{$this->item->id}")->assertRedirect()
+        ->assertSessionHas('notification.type', 'error');
+    expect(Item::find($this->item->id))->not->toBeNull();
+
+    // taken out of the cart again, it can go
+    $this->post("/shopping_list/remove_cart/{$this->item->id}")->assertRedirect();
+    $this->delete("/shopping_list/destroy_item/{$this->item->id}")->assertRedirect();
+    expect(Item::find($this->item->id))->toBeNull();
+});
+
 it('lets a selected member manage lists of a type without being an admin', function () {
     $member = memberWith($this->f['family'], $this->f['groceries'], ['can_manage_lists']);
     $this->actingAs($member);

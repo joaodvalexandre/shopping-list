@@ -56,7 +56,7 @@ php artisan serve --host=0.0.0.0 --port=8000        # reachable from the network
 flutter build apk --debug --dart-define=API_BASE_URL=http://192.168.1.143:8000   # this PC's address on the Wi-Fi
 ```
 
-Install the one APK from `build/app/outputs/flutter-apk/app-debug.apk` on every phone: nearby sync only works between phones on **exactly the same version and build number** (`version:` in `pubspec.yaml`, shown in Settings), so raise the build number (`1.1.0+4`) whenever you change the app and install it everywhere.
+Install the one APK from `build/app/outputs/flutter-apk/app-debug.apk` on every phone: nearby sync only works between phones on **exactly the same version and build number** (`version:` in `pubspec.yaml`, shown in Settings), so raise the build number (`1.1.0+7`) whenever you change the app and install it everywhere.
 
 ```bash
 flutter analyze        # static analysis

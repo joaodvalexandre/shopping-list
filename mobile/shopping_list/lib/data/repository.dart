@@ -224,10 +224,11 @@ class Repository extends ChangeNotifier {
     if (changed.isNotEmpty) _changed(saveItems: changed);
   }
 
+  /// Not while the item is in the cart: it is about to be bought, so it has to come out of the cart first.
   void deleteItem(String listUuid, String uuid) {
     final list = _lists[listUuid];
     final item = _item(listUuid, uuid);
-    if (list == null || item == null) return;
+    if (list == null || item == null || item.status == ItemStatus.inCart) return;
 
     _remember(uuid, list: false, listUuid: listUuid);
 
@@ -769,7 +770,7 @@ class Repository extends ChangeNotifier {
           }
 
         case 'delete':
-          if (item == null || !both(type, Ability.editItems)) continue;
+          if (item == null || !both(type, Ability.editItems) || item.status == ItemStatus.inCart) continue;
 
           _remember(uuid, list: false, listUuid: list.uuid, at: (entry['at'] as num?)?.toInt());
           if (item.pending.isNew) {

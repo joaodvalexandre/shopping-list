@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../data/me.dart';
 import '../../data/models.dart';
@@ -68,12 +67,6 @@ class ListDetailScreen extends StatelessWidget {
                     color: Tw.green500,
                     onPressed: (allInCart && hasItems) ? () => repository.markPurchased(listUuid) : null,
                   ),
-                PillButton(
-                  label: context.t('export'),
-                  icon: Icons.download_outlined,
-                  color: Tw.orange500,
-                  onPressed: hasItems ? () => _export(context, list, items) : null,
-                ),
                 if (canAdd)
                   PillButton(
                     label: context.t('new_item'),
@@ -115,13 +108,6 @@ class ListDetailScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  /// The web exports a markdown checklist; here it goes to whatever app the person picks.
-  Future<void> _export(BuildContext context, ShoppingListRecord list, List<ItemRecord> items) {
-    final text = items.map((item) => '- [ ] ${item.name}').join('\n');
-
-    return SharePlus.instance.share(ShareParams(text: text, subject: list.name));
   }
 }
 
@@ -198,7 +184,8 @@ class _ItemRow extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => ItemFormScreen(listUuid: item.listUuid, itemUuid: item.uuid)),
                 ),
               ),
-            if (canEdit)
+            // What is in the cart is about to be bought: it cannot be deleted until taken out
+            if (canEdit && item.status != ItemStatus.inCart)
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: context.t('delete'),

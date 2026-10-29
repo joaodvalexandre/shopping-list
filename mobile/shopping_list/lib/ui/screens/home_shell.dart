@@ -42,6 +42,7 @@ class _HomeShellState extends State<HomeShell> {
       final key = switch (r.reason) {
         'forbidden' => 'app_rejected_forbidden',
         'not_found' => 'app_rejected_not_found',
+        'in_cart' => 'app_rejected_in_cart',
         _ => 'app_rejected_invalid',
       };
       return context.rt(key, {'name': r.name});

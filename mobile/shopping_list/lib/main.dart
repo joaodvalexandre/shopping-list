@@ -218,6 +218,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // The radio for phones nearby is only on while the app is on screen
     context.read<NearbyService>().setForeground(state == AppLifecycleState.resumed);
+    context.read<SyncService>().setForeground(state == AppLifecycleState.resumed);
 
     if (state == AppLifecycleState.resumed) {
       context.read<SyncService>().sync();

@@ -26,6 +26,9 @@ class FakeRadio implements NearbyRadio {
   String name = '';
   bool started = false;
   bool refuses = false;
+
+  /// Calls to this phone vanish in the air: neither a connection nor an error comes back.
+  bool stalls = false;
   int starts = 0;
   final accepted = <String>{};
 
@@ -58,7 +61,7 @@ class FakeRadio implements NearbyRadio {
   @override
   Future<void> connect(String endpointId, {required String name}) async {
     final other = air.byId(endpointId);
-    if (other == null || !other.started) return;
+    if (other == null || !other.started || stalls) return;
 
     _later(() {
       events?.initiated(endpointId, other.name);
@@ -140,6 +143,7 @@ void main() {
     bool Function()? offline,
     Future<bool> Function()? permissions,
     Duration meetAgainAfter = const Duration(hours: 1),
+    Duration linkTimeout = const Duration(seconds: 45),
   }) async {
     final phone = await makePhone(userId: userId, name: name, version: version, lists: shopping, items: basics);
     final radio = FakeRadio(air, 'ep-$device');
@@ -160,6 +164,8 @@ void main() {
       ensurePermissions: permissions ?? () async => true,
       meetAgainAfter: meetAgainAfter,
       callAfterWaiting: const Duration(milliseconds: 100),
+      retryAfter: const Duration(milliseconds: 50),
+      linkTimeout: linkTimeout,
     );
 
     return (phone: phone, radio: radio, service: service, trigger: trigger);
@@ -206,6 +212,40 @@ void main() {
     ana.radio.events!.found('ep-bbbb', rui.radio.name);
 
     await until(() => rui.phone.repo.itemsOf('L1').any((i) => i.name == 'Ribs'));
+  });
+
+  test('they meet again soon after something changed here, without waiting for the next round', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana');
+    final rui = await phoneWithService('bbbb', 3, 'Rui');
+    ana.service.setForeground(true);
+    rui.service.setForeground(true);
+
+    await until(() => ana.service.lastResult != null && rui.service.lastResult != null);
+    await until(() => ana.service.state == NearbyState.searching);
+
+    ana.phone.repo.addItem('L1', name: 'Ribs', quantity: 2);
+    ana.trigger.fire();
+
+    await until(() => rui.phone.repo.itemsOf('L1').any((i) => i.name == 'Ribs'));
+  });
+
+  test('a call that never gets an answer is dropped and tried again, and then works', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana', linkTimeout: const Duration(milliseconds: 200));
+    final rui = await phoneWithService('bbbb', 3, 'Rui', linkTimeout: const Duration(milliseconds: 200));
+    rui.radio.stalls = true;
+    ana.radio.stalls = true;
+
+    ana.service.setForeground(true);
+    rui.service.setForeground(true);
+
+    // nothing comes back: the link is given up on, and does not block the next one
+    await until(() => ana.service.lastResult?.status.name == 'timeout');
+    await until(() => ana.service.state == NearbyState.searching);
+
+    ana.radio.stalls = false;
+    rui.radio.stalls = false;
+
+    await until(() => ana.service.lastResult?.ok == true && rui.service.lastResult?.ok == true);
   });
 
   test('a phone on another version is never connected to, and the person is told', () async {

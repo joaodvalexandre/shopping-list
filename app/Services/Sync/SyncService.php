@@ -199,6 +199,10 @@ class SyncService
             if (! $user->can('editItems', $list)) {
                 return $this->rejected('forbidden');
             }
+            // Someone put it in the cart meanwhile: it is about to be bought, so it stays
+            if ($existing->isInCart()) {
+                return $this->rejected('in_cart');
+            }
             $existing->delete();
 
             return $this->applied();

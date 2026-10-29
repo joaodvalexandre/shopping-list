@@ -14,7 +14,14 @@ enum SyncStatus { idle, syncing, offline, error }
 /// Runs soon after every local edit, every half minute while the app is open,
 /// when the connection comes back, and when the person asks.
 class SyncService extends ChangeNotifier {
-  SyncService({required this.api, required this.repository, required this.auth, this.onSynced}) {
+  SyncService({
+    required this.api,
+    required this.repository,
+    required this.auth,
+    this.onSynced,
+    this.watchEvery = const Duration(seconds: 4),
+    this.connectivityChanges,
+  }) {
     repository.onLocalChange = requestSoon;
   }
 
@@ -25,6 +32,12 @@ class SyncService extends ChangeNotifier {
   /// Called after every successful sync (the notifier looks for what others did).
   final Future<void> Function()? onSynced;
 
+  /// How often, while the app is on screen, the server is asked whether anything changed.
+  final Duration watchEvery;
+
+  /// When the phone's connection changes (the platform's, unless a test provides its own).
+  final Stream<List<ConnectivityResult>>? connectivityChanges;
+
   SyncStatus _status = SyncStatus.idle;
   DateTime? _lastSync;
   String? _lastError;
@@ -33,6 +46,10 @@ class SyncService extends ChangeNotifier {
 
   Timer? _debounce;
   Timer? _periodic;
+  Timer? _watcher;
+  String? _marker;
+  bool _watching = false;
+  bool _foreground = true;
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
   bool _running = false;
   bool _again = false;
@@ -56,14 +73,56 @@ class SyncService extends ChangeNotifier {
 
   void start() {
     _periodic ??= Timer.periodic(const Duration(seconds: 30), (_) => sync());
-    _connectivity ??= Connectivity().onConnectivityChanged.listen((results) {
+    _connectivity ??= (connectivityChanges ?? Connectivity().onConnectivityChanged).listen((results) {
       if (results.any((result) => result != ConnectivityResult.none)) sync();
     });
+    _startWatching();
     sync();
+  }
+
+  /// The watcher only runs while the app is on screen; in the background the phone is left alone.
+  void setForeground(bool foreground) {
+    _foreground = foreground;
+    if (foreground) {
+      if (_periodic != null) _startWatching();
+    } else {
+      _stopWatching();
+    }
+  }
+
+  void _startWatching() {
+    if (!_foreground) return;
+    _watcher ??= Timer.periodic(watchEvery, (_) => _watch());
+  }
+
+  void _stopWatching() {
+    _watcher?.cancel();
+    _watcher = null;
+  }
+
+  /// The "watcher": a tiny request for a marker of what changed. Another phone or the web
+  /// changing something makes the marker differ, and the phone syncs at once instead of at the next round.
+  Future<void> _watch() async {
+    if (_watching || _running || _unreachable || auth.status != AuthStatus.signedIn) return;
+
+    _watching = true;
+    try {
+      final marker = await api.watch();
+      final changed = _marker != null && marker != _marker;
+      _marker = marker;
+
+      if (changed) await sync();
+    } catch (_) {
+      // offline or a hiccup: the ordinary sync keeps its own rounds and does the reporting
+    } finally {
+      _watching = false;
+    }
   }
 
   void stop() {
     _debounce?.cancel();
+    _stopWatching();
+    _marker = null;
     _periodic?.cancel();
     _periodic = null;
     _connectivity?.cancel();
@@ -97,6 +156,7 @@ class SyncService extends ChangeNotifier {
       _lastError = null;
       _unreachable = false;
       _set(SyncStatus.idle);
+      await _rememberMarker();
       await onSynced?.call();
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
@@ -114,6 +174,15 @@ class SyncService extends ChangeNotifier {
       _set(SyncStatus.error);
     } finally {
       _running = false;
+    }
+  }
+
+  /// What the server looks like now, after our own changes went in: only what happens from here on is news.
+  Future<void> _rememberMarker() async {
+    try {
+      _marker = await api.watch();
+    } catch (_) {
+      _marker = null; // learned again by the next look
     }
   }
 

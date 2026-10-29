@@ -193,5 +193,9 @@ class ApiClient {
 
   Future<Map<String, dynamic>> sync(Map<String, dynamic> payload) => _send('POST', '/sync', body: payload);
 
+  /// A marker of what this person may see: when it differs from the last one, something changed
+  /// (on the web or on another phone) and a sync is worth running. Cheap enough to ask every few seconds.
+  Future<String> watch() async => (await _send('GET', '/watch'))['version'] as String;
+
   void close() => _client.close();
 }

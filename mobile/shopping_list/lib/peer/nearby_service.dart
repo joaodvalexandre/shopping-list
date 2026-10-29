@@ -52,6 +52,8 @@ class NearbyService extends ChangeNotifier {
     this.ensurePermissions = askForNearbyPermissions,
     this.meetAgainAfter = const Duration(seconds: 60),
     this.callAfterWaiting = const Duration(seconds: 12),
+    this.retryAfter = const Duration(seconds: 5),
+    this.linkTimeout = const Duration(seconds: 45),
   }) : _trigger = trigger {
     _trigger.addListener(_evaluate);
   }
@@ -75,6 +77,12 @@ class NearbyService extends ChangeNotifier {
   final Duration meetAgainAfter;
   final Duration callAfterWaiting;
 
+  /// After a call that did not work (Bluetooth is not always quick): the first wait, which grows with each failure.
+  final Duration retryAfter;
+
+  /// A connection that has neither finished nor failed by then is dropped, so it cannot block the next one.
+  final Duration linkTimeout;
+
   static const enabledKey = 'nearby_sync';
   static const _askedKey = 'nearby_permission_asked';
 
@@ -89,6 +97,9 @@ class NearbyService extends ChangeNotifier {
   final _lastMeeting = <String, DateTime>{};
   final _pendingAtMeeting = <String, int>{};
   final _waitingToCall = <String, Timer>{};
+  final _failures = <String, int>{};
+  final _retryNotBefore = <String, DateTime>{};
+  Timer? _watchdog;
 
   _Link? _link;
 
@@ -142,6 +153,21 @@ class NearbyService extends ChangeNotifier {
       _start();
     } else if (!want && (_running || _starting)) {
       _stop();
+    } else if (_running) {
+      _meetSoonIfChanged();
+    }
+  }
+
+  /// Something changed here since the last meeting with a phone in sight: no need to wait for the next round.
+  void _meetSoonIfChanged() {
+    if (_link != null) return;
+
+    for (final peer in _seen.values) {
+      final before = _pendingAtMeeting[peer.device];
+      if (before != null && before != repository.pendingCount) {
+        _call(peer);
+        return;
+      }
     }
   }
 
@@ -188,6 +214,9 @@ class NearbyService extends ChangeNotifier {
       timer.cancel();
     }
     _waitingToCall.clear();
+    _failures.clear();
+    _retryNotBefore.clear();
+    _watchdog?.cancel();
     _seen.clear();
     _otherVersion = null;
 
@@ -253,19 +282,47 @@ class NearbyService extends ChangeNotifier {
   }
 
   Future<void> _call(NearbyPeer peer) async {
-    if (!_running || _link != null || !_seen.containsKey(peer.endpointId) || !_due(peer)) {
+    final retryIn = _retryIn(peer);
+
+    if (!_running || _link != null || !_seen.containsKey(peer.endpointId) || retryIn > Duration.zero || !_due(peer)) {
       // try again a little later: they stay in sight for as long as they are in range
       if (_running && _seen.containsKey(peer.endpointId)) {
-        _waitingToCall[peer.endpointId]?.cancel();
-        _waitingToCall[peer.endpointId] = Timer(meetAgainAfter, () => _call(peer));
+        _scheduleCall(peer, _link != null ? retryAfter : (retryIn > Duration.zero ? retryIn : meetAgainAfter));
       }
       return;
     }
 
     _currentPeer = peer.person;
-    _link = _Link(peer.endpointId, peer);
+    final link = _link = _Link(peer.endpointId, peer);
+    _armWatchdog(link);
     _set(NearbyState.connecting);
     await radio.connect(peer.endpointId, name: endpointName);
+  }
+
+  void _scheduleCall(NearbyPeer peer, Duration delay) {
+    if (!_running || !_seen.containsKey(peer.endpointId)) return;
+
+    _waitingToCall[peer.endpointId]?.cancel();
+    _waitingToCall[peer.endpointId] = Timer(delay, () => _call(peer));
+  }
+
+  /// How much longer to leave a phone alone after a call to it failed.
+  Duration _retryIn(NearbyPeer peer) {
+    final notBefore = _retryNotBefore[peer.device];
+    if (notBefore == null) return Duration.zero;
+
+    final left = notBefore.difference(DateTime.now());
+    return left > Duration.zero ? left : Duration.zero;
+  }
+
+  void _armWatchdog(_Link link) {
+    _watchdog?.cancel();
+    _watchdog = Timer(linkTimeout, () {
+      if (_link != link) return;
+
+      radio.disconnect(link.endpointId);
+      _finish(link, PeerResult(PeerStatus.timeout));
+    });
   }
 
   // ---------------------------------------------------------- the connection
@@ -279,7 +336,10 @@ class NearbyService extends ChangeNotifier {
       return;
     }
 
-    _link ??= _Link(endpointId, peer);
+    if (_link == null) {
+      final link = _link = _Link(endpointId, peer);
+      _armWatchdog(link);
+    }
     _currentPeer = peer.person;
     _set(NearbyState.connecting);
     radio.accept(endpointId);
@@ -335,13 +395,34 @@ class NearbyService extends ChangeNotifier {
     _finish(link, result);
   }
 
+  /// A call that never became a meeting: worth trying again soon (the others, even a refusal, are not).
+  static const _failed = {PeerStatus.protocol, PeerStatus.disconnected, PeerStatus.timeout};
+
   void _finish(_Link link, PeerResult? result) {
+    if (link.finished) return;
+    link.finished = true;
+
+    _watchdog?.cancel();
     if (_link == link) _link = null;
     link.channel.close();
     _currentPeer = null;
 
-    _lastMeeting[link.peer.device] = DateTime.now();
-    _pendingAtMeeting[link.peer.device] = repository.pendingCount;
+    final peer = link.peer;
+    if (result == null || _failed.contains(result.status)) {
+      final failures = _failures[peer.device] = (_failures[peer.device] ?? 0) + 1;
+      final wait = retryAfter * (failures > 6 ? 6 : failures);
+
+      _retryNotBefore[peer.device] = DateTime.now().add(wait);
+      _scheduleCall(peer, wait);
+    } else {
+      _failures.remove(peer.device);
+      _retryNotBefore.remove(peer.device);
+      _lastMeeting[peer.device] = DateTime.now();
+      _pendingAtMeeting[peer.device] = repository.pendingCount;
+
+      // the next round, with the caller going first
+      _scheduleCall(peer, shouldCall(deviceId, peer.device) ? meetAgainAfter : meetAgainAfter + callAfterWaiting);
+    }
 
     if (result != null) {
       _lastResult = result;
@@ -375,6 +456,7 @@ class _Link {
   final NearbyPeer peer;
   final assembler = FrameAssembler();
   final channel = _RadioChannel();
+  bool finished = false;
 }
 
 class _RadioChannel implements PeerChannel {

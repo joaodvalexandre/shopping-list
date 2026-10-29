@@ -111,7 +111,7 @@
                                     @endif
 
                                     <!-- Delete -->
-                                    @if($can['edit_items'])
+                                    @if($can['edit_items'] && ! $item->isInCart())
                                         <x-delete-button action="{{ route('shopping_list.destroy_item', ['item_id' => $item->id]) }}" />
                                     @endif
                                 </div>

@@ -55,4 +55,10 @@ class Item extends Model
     {
         return $this->belongsTo(Status::class);
     }
+
+    /** An item in the cart is about to be bought: it cannot be deleted until it is taken out. */
+    public function isInCart(): bool
+    {
+        return $this->status?->code === 'in_cart';
+    }
 }

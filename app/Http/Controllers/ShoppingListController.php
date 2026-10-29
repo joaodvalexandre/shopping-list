@@ -191,6 +191,13 @@ class ShoppingListController extends Controller
         $item = $this->visibleItem($request->route('item_id'));
         Gate::authorize('editItems', $item->shoppingList);
 
+        // What is in the cart is about to be bought: take it out of the cart first
+        if ($item->isInCart()) {
+            $this->notificationToggle('item_in_cart_cannot_delete', 'error');
+
+            return redirect()->route('shopping_list.show', $item->shopping_list_id);
+        }
+
         $item->delete();
         $this->notificationToggle('item_destroyed_success', 'success');
 

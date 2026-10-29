@@ -55,6 +55,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // The phone's "has anything changed?" check: every few seconds, from every device of a person
+        RateLimiter::for('watch', function (Request $request) {
+            return Limit::perMinute(240)->by($request->user()?->id ?: $request->ip());
+        });
+
         Password::defaults(fn () => Password::min(8)->letters()->numbers());
 
         // Family admins manage their own family's members and list types

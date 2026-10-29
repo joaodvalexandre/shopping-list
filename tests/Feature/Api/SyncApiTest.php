@@ -264,6 +264,27 @@ it('deletes through tombstones and lets deletion win over later edits', function
     expect(Item::withTrashed()->find($item->id)->name)->not->toBe('Zombie');
 });
 
+it('refuses to delete an item that is in the cart', function () {
+    $list = listIn($this->f['groceries']);
+    $item = itemIn($list, 2);   // in the cart
+
+    $response = syncAs($this->f['admin'], ['changes' => ['items' => [
+        ['uuid' => $item->uuid, 'list_uuid' => $list->uuid, 'deleted_at' => ago(0)],
+    ]]]);
+
+    expect($response->json("results.items.{$item->uuid}.status"))->toBe('rejected')
+        ->and($response->json("results.items.{$item->uuid}.reason"))->toBe('in_cart')
+        ->and(Item::find($item->id))->not->toBeNull();
+
+    // out of the cart, the same request goes through
+    $item->update(['status_id' => 1]);
+    $response = syncAs($this->f['admin'], ['changes' => ['items' => [
+        ['uuid' => $item->uuid, 'list_uuid' => $list->uuid, 'deleted_at' => ago(0)],
+    ]]]);
+    expect($response->json("results.items.{$item->uuid}.status"))->toBe('applied')
+        ->and(Item::find($item->id))->toBeNull();
+});
+
 it('rejects pushes to hidden lists as if they did not exist', function () {
     $list = listIn($this->f['party']);
     $item = itemIn($list);

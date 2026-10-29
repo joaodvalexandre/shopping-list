@@ -236,6 +236,20 @@ void main() {
       expect(ana.repo.itemsOf('L1').map((i) => i.name), isNot(contains('Wine')));   // and the deletion reached Ana
     });
 
+    test('an item in the cart is not deleted, here nor by a phone that deleted it first', () async {
+      final ana = await makePhone(userId: 2, name: 'Ana', lists: shopping, items: basics);
+      final rui = await makePhone(userId: 3, name: 'Rui', lists: shopping, items: basics);
+
+      // Ana deletes the bread; meanwhile Rui puts it in the cart
+      ana.repo.deleteItem('L1', 'I2');
+      rui.repo.setStatus('L1', 'I2', ItemStatus.inCart);
+      rui.repo.deleteItem('L1', 'I2');   // and cannot delete it from there
+
+      await meet(ana, rui);
+
+      expect(rui.repo.itemsOf('L1').map((i) => i.name), contains('Bread'));   // Rui keeps it: it is in his cart
+    });
+
     test('meeting again changes nothing', () async {
       final ana = await makePhone(userId: 2, name: 'Ana', lists: shopping, items: basics);
       final rui = await makePhone(userId: 3, name: 'Rui', lists: shopping, items: basics);

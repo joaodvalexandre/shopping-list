@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\PeerCredentialController;
 use App\Http\Controllers\Api\V1\SyncController;
+use App\Http\Controllers\Api\V1\WatchController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,6 +41,8 @@ Route::prefix('v1')->group(function () {
         Route::delete('me/devices/{device}', [MeController::class, 'revokeDevice']);
 
         Route::post('sync', SyncController::class);
+        // Asked every few seconds while the app is open, so it has a limit of its own
+        Route::get('watch', [WatchController::class, 'show'])->withoutMiddleware('throttle:api')->middleware('throttle:watch');
         Route::get('activity', [ActivityController::class, 'index']);
 
         // Family administration, for family admins only (the web's Family pages)
