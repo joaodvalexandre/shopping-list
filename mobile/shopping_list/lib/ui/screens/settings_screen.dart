@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/api_client.dart';
 import '../../data/repository.dart';
+import '../../peer/nearby_service.dart';
+import '../../state/notification_service.dart';
 import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
 import '../theme.dart';
@@ -22,11 +26,13 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late Future<List<Map<String, dynamic>>> _devices;
+  late bool _notifications;
 
   @override
   void initState() {
     super.initState();
     _devices = _loadDevices();
+    _notifications = context.read<NotificationService>().enabled;
   }
 
   Future<List<Map<String, dynamic>>> _loadDevices() => context.read<ApiClient>().devices();
@@ -82,6 +88,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
 
           const Panel(padding: EdgeInsets.all(20), child: PasswordForm()),
+          const SizedBox(height: 12),
+
+          // Notifications about what others did
+          Panel(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(padding: const EdgeInsets.only(top: 8), child: Text(context.t('app_notifications'), style: const TextStyle(fontSize: 20))),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(context.t('app_notifications_switch')),
+                  value: _notifications,
+                  onChanged: (on) async {
+                    final allowed = await context.read<NotificationService>().setEnabled(on);
+                    if (!context.mounted) return;
+                    setState(() => _notifications = on);
+                    if (on && !allowed) toast(context, context.rt('app_notifications_denied'));
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(context.t('app_notifications_help'), style: TextStyle(fontSize: 12, color: muted)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Phones of the family nearby, for when there is no way to the server
+          _nearbyPanel(context, muted),
           const SizedBox(height: 12),
 
           // Sync
@@ -164,6 +201,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: FilledButton(onPressed: () => signOut(context), child: Text(context.t('logout').toUpperCase())),
           ),
           const MenuFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _nearbyPanel(BuildContext context, Color muted) {
+    final nearby = context.watch<NearbyService>();
+    final last = nearby.lastResult;
+
+    final lastText = last == null
+        ? null
+        : last.ok
+            ? context.t('app_nearby_done', {'name': last.peerName ?? '', 'sent': last.sent, 'received': last.applied.total})
+            : null;
+
+    return Panel(
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text(context.t('app_nearby'), style: const TextStyle(fontSize: 20))),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(context.t('app_nearby_switch')),
+            value: nearby.enabled,
+            onChanged: (on) => nearby.setEnabled(on),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(context.t('app_nearby_help'), style: TextStyle(fontSize: 12, color: muted)),
+          ),
+          if (nearby.enabled && nearby.permissionDenied) ...[
+            const SizedBox(height: 8),
+            Notice(context.t('app_nearby_permission')),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(onPressed: openAppSettings, child: Text(context.t('app_nearby_open_settings'))),
+            ),
+          ],
+          if (nearby.enabled && nearby.radioFailed) ...[const SizedBox(height: 8), Notice(context.t('app_nearby_radio_failed'))],
+          if (lastText != null) ...[
+            const SizedBox(height: 8),
+            Text(context.t('app_nearby_last', {'text': lastText}), style: TextStyle(fontSize: 12, color: muted)),
+          ],
+          const SizedBox(height: 4),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) => snapshot.hasData
+                ? Text('${context.t('app_version')} ${snapshot.data!.version}+${snapshot.data!.buildNumber}', style: TextStyle(fontSize: 12, color: muted))
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );

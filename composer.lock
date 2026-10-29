@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "10f64c9ad77123c67b236ca4c4bca9e5",
+    "content-hash": "d590456658d8b415143e9cf6e2451dd4",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -10359,16 +10359,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "2.3.12",
+            "version": "2.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "88d1b98f3bb34b2a1316ed6a85b675bf6c98cbb4"
+                "reference": "e3647094ed8f0f1f67393d812b793a5143e25af3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/88d1b98f3bb34b2a1316ed6a85b675bf6c98cbb4",
-                "reference": "88d1b98f3bb34b2a1316ed6a85b675bf6c98cbb4",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/e3647094ed8f0f1f67393d812b793a5143e25af3",
+                "reference": "e3647094ed8f0f1f67393d812b793a5143e25af3",
                 "shasum": ""
             },
             "require": {
@@ -10400,9 +10400,9 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.12"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.4.0"
             },
-            "time": "2026-10-28T20:04:36+00:00"
+            "time": "2026-10-28T20:28:58+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -12018,7 +12018,8 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.3"
+        "php": "^8.3",
+        "ext-sodium": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

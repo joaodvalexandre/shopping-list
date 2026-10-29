@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../core/time.dart';
+import 'activity.dart';
 
 /// What went wrong talking to the server, in terms the app can act on.
 class ApiException implements Exception {
@@ -162,6 +163,14 @@ class ApiClient {
   }
 
   Future<void> removeDevice(int id) => _send('DELETE', '/me/devices/$id');
+
+  /// What others did on the family's lists since [after]. With no cursor the server only
+  /// says where the feed stands now.
+  Future<ActivityPage> activity({int? after}) async =>
+      ActivityPage.fromJson(await _send('GET', after == null ? '/activity' : '/activity?after=$after'));
+
+  /// A server-signed statement for family phones nearby, tied to this phone's public key.
+  Future<Map<String, dynamic>> peerCredential(String publicKey) => _send('POST', '/me/peer-credential', body: {'public_key': publicKey});
 
   // ---- Family administration (family admins only; needs a connection)
 

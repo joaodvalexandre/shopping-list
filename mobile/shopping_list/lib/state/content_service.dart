@@ -34,6 +34,9 @@ class ContentService extends ChangeNotifier {
     return ContentService(store, snapshot);
   }
 
+  /// The language that supplies any text a language lacks.
+  static const fallbackLanguage = 'en';
+
   String get version => _data.version;
   List<ContentLanguage> get languages => _data.languages;
 
@@ -44,6 +47,14 @@ class ContentService extends ChangeNotifier {
 
   /// A text in a language, else null (the caller falls back).
   String? text(String language, String key) => _data.texts[language]?[key];
+
+  /// A text of the app in a language, else in English, else the key; `:name` parameters
+  /// are replaced from [params]. Used by the screens and by the background notifier alike.
+  String translate(String language, String key, [Map<String, Object> params = const {}]) {
+    var result = text(language, key) ?? text(fallbackLanguage, key) ?? key;
+    params.forEach((name, value) => result = result.replaceAll(':$name', value.toString()));
+    return result;
+  }
 
   ContentPage? page(String slug) => _data.pages.where((p) => p.slug == slug).firstOrNull;
 

@@ -16,7 +16,10 @@ The Android app of the Cestou web app (see the [project README](../../README.md)
 
 - **Family** (family admins only, a third tab): members with their role and first-login status, add/edit with a permission chip per ability and list type, reset a password (the temporary password is shown with a Copy button), remove, and the family's list types. These need a connection; the rules (last admin, a type in use...) are the server's, and its messages come back in the app's language.
 
-Not in the app yet: phone-to-phone sync.
+- **Notifications** about what others did (an item added, put in the cart or bought, a new list): with the app in use nothing is shown (you see it arrive); in the background the phone asks the server every ~15 minutes (Android's shortest interval for scheduled work, so a notification may come up to that late) and a tap opens the list. Never about your own changes, nor about lists you may not see. On/off in Settings; Android 13+ asks for permission at the first sign-in. There is no Firebase behind it. On Samsung phones, take the app out of "sleeping apps" so the schedule is not stopped.
+- **Nearby sync**: with no way to the server, the app looks for the nearest phone of the same family running **exactly the same version** (Settings shows it) and swaps what neither has sent yet, over Bluetooth/Wi-Fi with no internet. Phones prove who they are with credentials the server signed, so nobody can see a list hidden from them or do what they may not. When any phone reaches the server again, the ordinary sync sends everything and brings back what changed on the web or on other phones. Only while the app is open and offline. See "Nearby sync" in [docs/api.md](../../docs/api.md).
+
+Not in the app yet: nothing planned.
 
 ## Name and icon
 
@@ -42,7 +45,18 @@ Sign in with `joana@demo.test` and the password `Silva` (the family name; the ap
 
 To point a build at another server: `flutter run --dart-define=API_BASE_URL=https://lists.example.com`, or type the address under **Server** on the sign-in screen.
 
-Plain `http` is only allowed for `localhost` and `10.0.2.2` (see `android/app/src/main/res/xml/network_security_config.xml`); any other server must use HTTPS.
+Plain `http` is only allowed for `localhost` and `10.0.2.2` in **release** builds (see `android/app/src/main/res/xml/network_security_config.xml`); any other server must use HTTPS. **Debug** builds may use plain `http` to any address (`android/app/src/debug/res/xml/`), which is what a test on the home network needs.
+
+### An APK for other phones on the same Wi-Fi
+
+To try the app (and nearby sync) on several phones with the server on this PC:
+
+```bash
+php artisan serve --host=0.0.0.0 --port=8000        # reachable from the network (allow it in the Windows firewall)
+flutter build apk --debug --dart-define=API_BASE_URL=http://192.168.1.143:8000   # this PC's address on the Wi-Fi
+```
+
+Install the one APK from `build/app/outputs/flutter-apk/app-debug.apk` on every phone: nearby sync only works between phones on **exactly the same version and build number** (`version:` in `pubspec.yaml`, shown in Settings), so raise the build number (`1.1.0+4`) whenever you change the app and install it everywhere.
 
 ```bash
 flutter analyze        # static analysis

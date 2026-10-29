@@ -25,7 +25,7 @@ class AuthState extends ChangeNotifier {
   final SettingsState settings;
   final FlutterSecureStorage _storage;
 
-  static const _tokenKey = 'device_token';
+  static const tokenKey = 'device_token';
   static const _stageKey = 'password_change_required';
 
   AuthStatus _status = AuthStatus.loading;
@@ -58,7 +58,7 @@ class AuthState extends ChangeNotifier {
 
   Future<String?> _readToken() async {
     try {
-      return await _storage.read(key: _tokenKey);
+      return await _storage.read(key: tokenKey);
     } catch (_) {
       return null; // an unreadable keystore means signing in again
     }
@@ -116,7 +116,7 @@ class AuthState extends ChangeNotifier {
   Future<void> _signedOut() async {
     _temporaryPassword = null;
     api.token = null;
-    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: tokenKey);
     await _storage.delete(key: _stageKey);
     await repository.wipe();
     _set(AuthStatus.signedOut);
@@ -124,7 +124,7 @@ class AuthState extends ChangeNotifier {
 
   Future<void> _storeToken(String token, {required bool mustChange}) async {
     api.token = token;
-    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: tokenKey, value: token);
     await _storage.write(key: _stageKey, value: mustChange ? 'true' : 'false');
   }
 

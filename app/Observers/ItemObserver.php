@@ -4,17 +4,20 @@ namespace App\Observers;
 
 use App\Events\ModelChanged;
 use App\Models\Item;
+use App\Support\Activity\ActivityRecorder;
 
 class ItemObserver
 {
     public function created(Item $item): void
     {
         $this->announce($item, 'created');
+        ActivityRecorder::itemAdded($item);
     }
 
     public function updated(Item $item): void
     {
         $this->announce($item, 'updated');
+        ActivityRecorder::itemChanged($item);
     }
 
     public function deleted(Item $item): void

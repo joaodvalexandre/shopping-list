@@ -4,12 +4,14 @@ namespace App\Observers;
 
 use App\Events\ModelChanged;
 use App\Models\ShoppingList;
+use App\Support\Activity\ActivityRecorder;
 
 class ShoppingListObserver
 {
     public function created(ShoppingList $list): void
     {
         $this->announce($list, 'created');
+        ActivityRecorder::listCreated($list);
     }
 
     public function updated(ShoppingList $list): void

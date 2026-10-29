@@ -16,6 +16,7 @@ const defaultServerUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'h
 class SettingsState extends ChangeNotifier {
   SettingsState(this._prefs, this.content) {
     _language = _initialLanguage();
+    _remember();
     // New texts, or a language added or removed, change what is on screen
     content.addListener(_contentChanged);
   }
@@ -23,10 +24,11 @@ class SettingsState extends ChangeNotifier {
   final SharedPreferences _prefs;
   final ContentService content;
 
-  static const fallbackLanguage = 'en';
-
   /// Flags next to the language names; any other language gets a globe.
   static const _flags = {'pt': '🇵🇹', 'en': '🇬🇧', 'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'it': '🇮🇹', 'nl': '🇳🇱'};
+
+  /// Where the language in use is remembered for code that runs without the app (notifications).
+  static const effectiveLanguageKey = 'language_effective';
 
   late String _language;
   ThemeMode _themeMode = ThemeMode.system;
@@ -62,9 +64,13 @@ class SettingsState extends ChangeNotifier {
     return content.hasLanguage(saved) ? saved! : (content.hasLanguage(device) ? device : content.defaultLanguage);
   }
 
+  /// The notifier that runs without the app words its messages in this language.
+  void _remember() => _prefs.setString(effectiveLanguageKey, _language);
+
   void _contentChanged() {
     // The language the person chose was taken off the server
     if (!content.hasLanguage(_language)) _language = content.defaultLanguage;
+    _remember();
     notifyListeners();
   }
 
@@ -77,15 +83,14 @@ class SettingsState extends ChangeNotifier {
   /// A text of the app in the chosen language ("Pending", "Entrar"...).
   /// `:name` placeholders are replaced from [params].
   String t(String key, [Map<String, Object> params = const {}]) {
-    var text = content.text(_language, key) ?? content.text(fallbackLanguage, key) ?? key;
-    params.forEach((name, value) => text = text.replaceAll(':$name', value.toString()));
-    return text;
+    return content.translate(_language, key, params);
   }
 
   Future<void> setLanguage(String code) async {
     if (!content.hasLanguage(code) || code == _language) return;
     _language = code;
     await _prefs.setString('language', code);
+    _remember();
     notifyListeners();
   }
 

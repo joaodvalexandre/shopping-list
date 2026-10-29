@@ -7,6 +7,7 @@ import 'package:shopping_list/data/api_client.dart';
 import 'package:shopping_list/data/content.dart';
 import 'package:shopping_list/state/content_service.dart';
 
+import 'support/fakes.dart';
 import 'support/memory_store.dart';
 
 Map<String, dynamic> payload({String version = 'v1', String privacy = 'Privacy'}) => {
@@ -35,9 +36,6 @@ Map<String, dynamic> payload({String version = 'v1', String privacy = 'Privacy'}
         {'id': 6, 'parent_id': null, 'location': 'footer', 'audience': 'everyone', 'label': {'pt': 'Vazio'}, 'page': null, 'url': null, 'new_tab': false},
       ],
     };
-
-ApiClient apiAnswering(Map<String, dynamic> Function(Uri uri) answer) =>
-    ApiClient(baseUrl: 'http://server', client: MockClient((request) async => http.Response(jsonEncode(answer(request.url)), 200)));
 
 void main() {
   late MemoryStore store;

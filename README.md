@@ -158,7 +158,7 @@ How the texts work: the texts that ship with the app live in `resources/lang/*.j
 
 ## Requirements
 
-- PHP **8.3+** (developed on 8.5) with the extensions `mbstring`, `openssl`, `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `curl`, `fileinfo`, `intl`, `zip`, `gd`, `exif`
+- PHP **8.3+** (developed on 8.5) with the extensions `mbstring`, `openssl`, `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `curl`, `fileinfo`, `intl`, `zip`, `gd`, `exif`, `sodium` (signs what lets family phones trust each other offline)
 - Composer 2.x
 - Node.js 20.19+ or 22.12+ (required by Vite 8) and npm
 - MySQL or MariaDB (tests run on in-memory SQLite and need no database)
@@ -267,8 +267,8 @@ If you find a vulnerability, please tell the maintainer privately rather than op
 - [x] Mobile API v1 with device tokens and delta sync
 - [x] Admin backoffice (Filament): families, members, languages, texts, pages, administrators, roles and permissions
 - [x] Mobile app: login, local database, offline queue and sync, same look and permissions as the web, texts/pages/menus kept locally
-- [ ] Nearby sync between family members' Android phones
-- [ ] Push notifications, item categories, audit log, data export/delete, backups
+- [x] Nearby sync between family members' Android phones (same app version only), and notifications about what others did
+- [ ] Item categories, audit log, data export/delete, backups, push via Firebase (instant notifications)
 
 ## License
 

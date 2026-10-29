@@ -14,7 +14,7 @@ enum SyncStatus { idle, syncing, offline, error }
 /// Runs soon after every local edit, every half minute while the app is open,
 /// when the connection comes back, and when the person asks.
 class SyncService extends ChangeNotifier {
-  SyncService({required this.api, required this.repository, required this.auth}) {
+  SyncService({required this.api, required this.repository, required this.auth, this.onSynced}) {
     repository.onLocalChange = requestSoon;
   }
 
@@ -22,10 +22,14 @@ class SyncService extends ChangeNotifier {
   final Repository repository;
   final AuthState auth;
 
+  /// Called after every successful sync (the notifier looks for what others did).
+  final Future<void> Function()? onSynced;
+
   SyncStatus _status = SyncStatus.idle;
   DateTime? _lastSync;
   String? _lastError;
   List<Rejection> _rejections = [];
+  bool _unreachable = false;
 
   Timer? _debounce;
   Timer? _periodic;
@@ -37,6 +41,11 @@ class SyncService extends ChangeNotifier {
   DateTime? get lastSync => _lastSync;
   String? get lastError => _lastError;
   bool get isSyncing => _status == SyncStatus.syncing;
+
+  /// True from a sync that failed for lack of a connection until one succeeds. Unlike [status]
+  /// it does not flip while the next attempt is under way, so it can decide whether to look
+  /// for phones nearby without switching the radio on and off every half minute.
+  bool get serverUnreachable => _unreachable;
 
   /// Changes the server refused since the last time the app asked.
   List<Rejection> takeRejections() {
@@ -86,16 +95,21 @@ class SyncService extends ChangeNotifier {
 
       _lastSync = DateTime.now();
       _lastError = null;
+      _unreachable = false;
       _set(SyncStatus.idle);
+      await onSynced?.call();
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         await auth.tokenRejected();
         _set(SyncStatus.idle);
       } else {
+        debugPrint('sync failed: ${e.status} ${e.message}');
         _lastError = e.message;
+        _unreachable = e.isOffline;
         _set(e.isOffline ? SyncStatus.offline : SyncStatus.error);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('sync failed: $e\n$stack');
       _lastError = e.toString();
       _set(SyncStatus.error);
     } finally {

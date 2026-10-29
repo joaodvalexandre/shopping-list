@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/repository.dart';
+import '../../peer/nearby_service.dart';
+import '../../peer/session.dart';
 import '../../state/auth_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
@@ -145,8 +147,13 @@ class SyncBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final sync = context.watch<SyncService>();
     final waiting = context.watch<Repository>().pendingCount;
+    final nearby = context.watch<NearbyService>();
+
+    // With no way to the server the phone may be talking to a phone nearby: say so
+    final (String? nearbyText, IconData nearbyIcon, Color nearbyColor) = _nearbyLine(context, nearby);
 
     final (String? text, IconData icon, Color color) = switch (sync.status) {
+      SyncStatus.offline when nearbyText != null => ('${context.t('app_offline')} · $nearbyText', nearbyIcon, nearbyColor),
       SyncStatus.offline => (context.t('app_offline'), Icons.cloud_off_outlined, Tw.gray500),
       SyncStatus.error => (context.t('app_sync_error'), Icons.error_outline, Tw.red600),
       SyncStatus.syncing when waiting > 0 => (context.t('app_syncing'), Icons.sync, Tw.blue500),
@@ -176,6 +183,31 @@ class SyncBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What to say about phones nearby (null: nothing). Another version is said first: it needs doing something.
+(String?, IconData, Color) _nearbyLine(BuildContext context, NearbyService nearby) {
+  if (nearby.state == NearbyState.off && nearby.otherVersionSeen == null) return (null, Icons.bluetooth, Tw.gray500);
+
+  if (nearby.otherVersionSeen != null) {
+    return (context.t('app_nearby_other_version', {'version': nearby.otherVersionSeen!}), Icons.system_update_outlined, Tw.amber600);
+  }
+
+  final who = nearby.currentPeer ?? '';
+  final last = nearby.lastResult;
+  final recent = nearby.lastMeetingAt != null && DateTime.now().difference(nearby.lastMeetingAt!) < const Duration(seconds: 25);
+
+  return switch (nearby.state) {
+    NearbyState.syncing => (context.t('app_nearby_syncing', {'name': who}), Icons.bluetooth_connected, Tw.blue500),
+    NearbyState.connecting => (context.t('app_nearby_connecting', {'name': who}), Icons.bluetooth_searching, Tw.blue500),
+    _ when recent && last != null && last.ok => (
+        context.t('app_nearby_done', {'name': last.peerName ?? '', 'sent': last.sent, 'received': last.applied.total}),
+        Icons.bluetooth_connected,
+        Tw.green600,
+      ),
+    _ when recent && last != null && last.status == PeerStatus.expired => (context.t('app_nearby_expired'), Icons.bluetooth_searching, Tw.amber600),
+    _ => (context.t('app_nearby_searching'), Icons.bluetooth_searching, Tw.blue500),
+  };
 }
 
 /// The page title strip below the top bar (the web's white "header").

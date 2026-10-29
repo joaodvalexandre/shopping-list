@@ -1,19 +1,32 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/api_client.dart';
 import 'data/local_db.dart';
 import 'data/repository.dart';
+import 'peer/identity.dart';
+import 'peer/nearby_service.dart';
+import 'peer/radio.dart';
 import 'state/auth_state.dart';
+import 'state/notification_service.dart';
+import 'state/background_notifications.dart';
 import 'state/content_service.dart';
 import 'state/settings_state.dart';
 import 'state/sync_service.dart';
 import 'ui/screens/first_login_screen.dart';
 import 'ui/screens/home_shell.dart';
+import 'ui/screens/list_detail_screen.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/top_bar.dart';
+
+/// Lets a tapped notification open a list from outside the widget tree.
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +40,43 @@ Future<void> main() async {
   final api = ApiClient(baseUrl: settings.serverUrl)..language = settings.language;
   settings.addListener(() => api.language = settings.language);
   final auth = AuthState(api: api, repository: repository, settings: settings);
-  final sync = SyncService(api: api, repository: repository, auth: auth);
+
+  // Notifications about what others did: the plugin, and the service that asks the server
+  final sink = await LocalNoticeSink.create(onTap: (uuid) => openListFromNotification(uuid, repository, auth));
+  final prefs = await SharedPreferences.getInstance();
+  final notifications = NotificationService(store: db, prefs: prefs, content: content, sink: sink);
+
+  // Phones of the family nearby: who this phone is, and the signed credential that proves it
+  final identity = PeerIdentity(secrets: const SecureSecretStore(), store: db);
+  final sync = SyncService(
+    api: api,
+    repository: repository,
+    auth: auth,
+    onSynced: () async {
+      // While the app is on screen the person sees changes arrive: only move the cursor.
+      // Paused but still running (the process lives a while), it notifies like the background job.
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      final onScreen = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+      await notifications.check(api, foreground: onScreen);
+      // The server is reachable: the moment to renew the credential nearby phones will ask for
+      await identity.refresh(api);
+    },
+  );
+
+  final info = await PackageInfo.fromPlatform();
+  final nearby = NearbyService(
+    radio: PluginRadio(),
+    identity: identity,
+    repository: repository,
+    prefs: prefs,
+    // Only identical builds exchange data
+    appVersion: '${info.version}+${info.buildNumber}',
+    deviceId: _deviceId(prefs),
+    trigger: Listenable.merge([sync, auth]),
+    offline: () => sync.serverUnreachable,
+    signedIn: () => auth.status == AuthStatus.signedIn,
+    personName: () => repository.me?.name ?? '',
+  );
 
   await auth.init();
 
@@ -40,10 +89,33 @@ Future<void> main() async {
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<SyncService>.value(value: sync),
         ChangeNotifierProvider<ContentService>.value(value: content),
+        Provider<NotificationService>.value(value: notifications),
+        ChangeNotifierProvider<NearbyService>.value(value: nearby),
+        Provider<LocalNoticeSink>.value(value: sink),
       ],
       child: const ShoppingListApp(),
     ),
   );
+}
+
+/// A short id of this installation, told to phones nearby so two of them can tell who calls whom.
+String _deviceId(SharedPreferences prefs) {
+  var id = prefs.getString('device_id');
+
+  if (id == null) {
+    final random = Random.secure();
+    id = [for (var i = 0; i < 3; i++) random.nextInt(256).toRadixString(16).padLeft(2, '0')].join();
+    prefs.setString('device_id', id);
+  }
+
+  return id;
+}
+
+/// Tapping a notification opens its list, if the person is signed in and still has it.
+void openListFromNotification(String listUuid, Repository repository, AuthState auth) {
+  if (auth.status != AuthStatus.signedIn || !repository.lists.any((list) => list.uuid == listUuid)) return;
+
+  navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => ListDetailScreen(listUuid: listUuid)));
 }
 
 class ShoppingListApp extends StatelessWidget {
@@ -54,6 +126,7 @@ class ShoppingListApp extends StatelessWidget {
     final settings = context.watch<SettingsState>();
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Cestou',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
@@ -82,6 +155,7 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   AuthStatus? _last;
+  bool _openedLaunchNotice = false;
 
   @override
   void initState() {
@@ -109,12 +183,32 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     final sync = context.read<SyncService>();
     if (status == AuthStatus.signedIn) {
       sync.start();
+      _startNotifications();
     } else {
       sync.stop();
+      if (status == AuthStatus.signedOut) cancelBackgroundChecks();
     }
 
     // Signing in or out can change which links and texts apply
     _refreshContent();
+  }
+
+  /// Ask Android's permission once, look for news in the background from now on, and
+  /// open the list a notification was tapped on if that is what started the app.
+  Future<void> _startNotifications() async {
+    final notifications = context.read<NotificationService>();
+    final sink = context.read<LocalNoticeSink>();
+    final repository = context.read<Repository>();
+    final auth = context.read<AuthState>();
+
+    await notifications.askPermissionOnce();
+    await scheduleBackgroundChecks();
+
+    final launched = await sink.launchedWith();
+    if (launched != null && !_openedLaunchNotice) {
+      _openedLaunchNotice = true;
+      openListFromNotification(launched, repository, auth);
+    }
   }
 
   /// Texts, pages and links from the server; quiet when it cannot be reached.
@@ -122,6 +216,9 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The radio for phones nearby is only on while the app is on screen
+    context.read<NearbyService>().setForeground(state == AppLifecycleState.resumed);
+
     if (state == AppLifecycleState.resumed) {
       context.read<SyncService>().sync();
       _refreshContent();

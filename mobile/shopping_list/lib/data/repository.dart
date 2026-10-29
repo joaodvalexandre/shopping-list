@@ -7,6 +7,7 @@ import '../core/time.dart';
 import 'local_db.dart';
 import 'me.dart';
 import 'models.dart';
+import 'peer_info.dart';
 
 /// A change the server refused (the person lacked the permission, the list was
 /// removed...). The app shows these instead of retrying forever.
@@ -39,6 +40,13 @@ class Repository extends ChangeNotifier {
   final Map<String, ShoppingListRecord> _lists = {};
   Me? _me;
 
+  /// Lists and items deleted here (or by a phone nearby): when, and which list or type they
+  /// were in. A phone nearby which still has one among its unsent changes cannot bring it
+  /// back, and a phone which still has it is told it is gone, even if the server never knew.
+  final Map<String, Map<String, dynamic>> _tombstones = {};
+  static const _tombstoneMetaKey = 'peer_tombstones';
+  static const _tombstoneKeepMs = 14 * 24 * 3600 * 1000;
+
   /// Called after every local edit, so the app can sync soon.
   VoidCallback? onLocalChange;
 
@@ -51,6 +59,10 @@ class Repository extends ChangeNotifier {
 
     final rawMe = await _db.getMeta('me');
     _me = rawMe == null ? null : Me.fromJson(jsonDecode(rawMe) as Map<String, dynamic>);
+
+    _tombstones
+      ..clear()
+      ..addAll(asMap(jsonDecode(await _db.getMeta(_tombstoneMetaKey) ?? '{}')).map((uuid, entry) => MapEntry(uuid, asMap(entry))));
     notifyListeners();
   }
 
@@ -131,6 +143,8 @@ class Repository extends ChangeNotifier {
   void deleteList(String uuid) {
     final list = _lists[uuid];
     if (list == null) return;
+
+    _remember(uuid, list: true, type: list.listTypeId);
 
     if (list.pending.isNew) {
       // Never reached the server: nothing to tell it
@@ -214,6 +228,8 @@ class Repository extends ChangeNotifier {
     final list = _lists[listUuid];
     final item = _item(listUuid, uuid);
     if (list == null || item == null) return;
+
+    _remember(uuid, list: false, listUuid: listUuid);
 
     if (item.pending.isNew) {
       list.items.remove(item);
@@ -519,9 +535,278 @@ class Repository extends ChangeNotifier {
     return outcome;
   }
 
+  // ------------------------------------------------------------ nearby phones
+  //
+  // With no way to the server, two phones of the same family nearby swap what they have not
+  // yet sent to it. What arrives is kept as this phone's own unsent change, so whichever phone
+  // reaches the server first passes it on, and the server settles any clash field by field,
+  // as it does for every sync.
+
+  /// The lists this phone holds: told to a phone nearby, which may then pass on changes to a
+  /// list whose "hidden from" only managers can see.
+  List<String> get heldListUuids => [
+        for (final list in _lists.values)
+          if (!list.pending.isDeleted) list.uuid,
+      ];
+
+  /// What this phone has not yet sent to the server, for a phone nearby: only the lists that
+  /// phone's person may see, and no more than is theirs to know.
+  Map<String, dynamic> buildPeerOffer(PeerInfo peer, Set<String> peerHolds) {
+    final lists = <Map<String, dynamic>>[];
+    final items = <Map<String, dynamic>>[];
+
+    // Who a list is hidden from is only known to those who manage it; for any other
+    // list the phone nearby must already hold it, which the server only allowed if it may.
+    bool mayShow(ShoppingListRecord list) {
+      if (!peer.can(list.listTypeId, Ability.view)) return false;
+      return can(list, Ability.manageLists) ? !list.hiddenFrom.contains(peer.userId) : peerHolds.contains(list.uuid);
+    }
+
+    for (final list in _lists.values) {
+      if (!mayShow(list)) continue;
+
+      final pending = list.pending;
+
+      if (pending.isDeleted) {
+        lists.add({'uuid': list.uuid, 'kind': 'delete', 'at': pending.fields[Pending.deleted]});
+        continue;
+      }
+
+      if (pending.isNew) {
+        lists.add({
+          'uuid': list.uuid,
+          'kind': 'new',
+          'name': list.name,
+          'name_at': list.nameChangedAt,
+          'type': list.listTypeId,
+          'hidden_from': list.hiddenFrom,
+        });
+      } else if (pending.has('name')) {
+        lists.add({'uuid': list.uuid, 'kind': 'update', 'name': list.name, 'name_at': list.nameChangedAt});
+      }
+
+      for (final item in list.items) {
+        final itemPending = item.pending;
+        if (itemPending.isEmpty) continue;
+
+        if (itemPending.isDeleted) {
+          items.add({'uuid': item.uuid, 'list': list.uuid, 'kind': 'delete', 'at': itemPending.fields[Pending.deleted]});
+        } else if (itemPending.isNew) {
+          items.add({
+            'uuid': item.uuid,
+            'list': list.uuid,
+            'kind': 'new',
+            'name': item.name,
+            'name_at': item.nameChangedAt,
+            'quantity': item.quantity,
+            'quantity_at': item.quantityChangedAt,
+            'status': item.status.code,
+            'status_at': item.statusChangedAt,
+          });
+        } else {
+          items.add({
+            'uuid': item.uuid,
+            'list': list.uuid,
+            'kind': 'update',
+            if (itemPending.has('name')) ...{'name': item.name, 'name_at': item.nameChangedAt},
+            if (itemPending.has('quantity')) ...{'quantity': item.quantity, 'quantity_at': item.quantityChangedAt},
+            if (itemPending.has('status')) ...{'status': item.status.code, 'status_at': item.statusChangedAt},
+          });
+        }
+      }
+    }
+
+    // What was deleted here and the other phone may still have (including what never reached the server)
+    _tombstones.forEach((uuid, entry) {
+      final at = entry['at'];
+
+      if (entry['kind'] == 'list') {
+        final type = (entry['type'] as num?)?.toInt();
+        if (_lists.containsKey(uuid) || type == null || !peer.can(type, Ability.view) || !peerHolds.contains(uuid)) return;
+        lists.add({'uuid': uuid, 'kind': 'delete', 'at': at});
+      } else {
+        final list = _lists[entry['list']];
+        if (list == null || !mayShow(list) || _item(list.uuid, uuid) != null) return;
+        items.add({'uuid': uuid, 'list': list.uuid, 'kind': 'delete', 'at': at});
+      }
+    });
+
+    return {'lists': lists, 'items': items};
+  }
+
+  /// Take in what a phone nearby offered. Each change is only accepted when **both** people
+  /// may make it (the other phone's rights come from its signed credential), the list is one
+  /// this phone holds, it is not hidden from this person, and nothing newer has happened to
+  /// that field here. Accepted changes become this phone's unsent changes.
+  Future<PeerApplied> applyPeerOffer(Map<String, dynamic> offer, PeerInfo peer) async {
+    final applied = PeerApplied();
+    final me = _me;
+    if (me == null) return applied;
+
+    bool both(int typeId, Ability ability) =>
+        peer.can(typeId, Ability.view) && peer.can(typeId, ability) && me.can(typeId, ability);
+
+    bool newer(Object? theirs, int mine) => theirs is num && theirs.toInt() > mine;
+
+    final saveLists = <ShoppingListRecord>{};
+    final saveItems = <ItemRecord>{};
+    final removeLists = <String>{};
+    final removeItems = <String>{};
+
+    for (final raw in (offer['lists'] as List? ?? const [])) {
+      final entry = asMap(raw);
+      final uuid = entry['uuid'];
+      if (uuid is! String) continue;
+
+      final existing = _lists[uuid];
+
+      switch (entry['kind']) {
+        case 'new':
+          final type = (entry['type'] as num?)?.toInt();
+          final hidden = [for (final id in (entry['hidden_from'] as List? ?? const [])) (id as num).toInt()];
+          final nameAt = (entry['name_at'] as num?)?.toInt() ?? nowMs();
+
+          if (existing != null || _tombstones.containsKey(uuid) || type == null || entry['name'] is! String) continue;
+          if (!me.listTypes.containsKey(type) || !both(type, Ability.manageLists) || hidden.contains(me.userId)) continue;
+
+          final list = ShoppingListRecord(
+            uuid: uuid,
+            name: (entry['name'] as String).trim(),
+            nameChangedAt: nameAt,
+            listTypeId: type,
+            hiddenFrom: hidden,
+            pending: Pending({Pending.created: nameAt}),
+          );
+          _lists[uuid] = list;
+          saveLists.add(list);
+          applied.lists++;
+
+        case 'update':
+          if (existing == null || existing.pending.isDeleted || !both(existing.listTypeId, Ability.manageLists)) continue;
+
+          if (entry['name'] is String && newer(entry['name_at'], existing.nameChangedAt)) {
+            existing.name = (entry['name'] as String).trim();
+            existing.nameChangedAt = (entry['name_at'] as num).toInt();
+            existing.pending.mark('name', existing.nameChangedAt);
+            saveLists.add(existing);
+            applied.lists++;
+          }
+
+        case 'delete':
+          if (existing == null || !both(existing.listTypeId, Ability.manageLists)) continue;
+
+          _remember(uuid, list: true, type: existing.listTypeId, at: (entry['at'] as num?)?.toInt());
+          if (existing.pending.isNew) {
+            _lists.remove(uuid);
+            removeLists.add(uuid);
+          } else {
+            existing.pending.mark(Pending.deleted, (entry['at'] as num?)?.toInt() ?? nowMs());
+            saveLists.add(existing);
+          }
+          applied.lists++;
+      }
+    }
+
+    for (final raw in (offer['items'] as List? ?? const [])) {
+      final entry = asMap(raw);
+      final uuid = entry['uuid'];
+      final list = _lists[entry['list']];
+      if (uuid is! String || list == null || list.pending.isDeleted) continue;
+
+      final type = list.listTypeId;
+      final item = _item(list.uuid, uuid);
+
+      // "new" for an item this phone has is just its latest fields, like an update
+      final action = (entry['kind'] == 'new' && item == null) ? 'create' : entry['kind'];
+
+      switch (action) {
+        case 'create':
+          // A new item: unless it was deleted here, or they may not add items to this list
+          if (_tombstones.containsKey(uuid) || !both(type, Ability.addItems)) continue;
+          if (entry['name'] is! String || entry['quantity'] is! num) continue;
+
+          final created = ItemRecord(
+            uuid: uuid,
+            listUuid: list.uuid,
+            name: (entry['name'] as String).trim(),
+            nameChangedAt: (entry['name_at'] as num?)?.toInt() ?? nowMs(),
+            quantity: (entry['quantity'] as num).toInt().clamp(1, 9999),
+            quantityChangedAt: (entry['quantity_at'] as num?)?.toInt() ?? nowMs(),
+            status: ItemStatus.fromCode(entry['status'] as String?),
+            statusChangedAt: (entry['status_at'] as num?)?.toInt() ?? nowMs(),
+          );
+          created.pending.mark(Pending.created, created.nameChangedAt);
+          list.items.add(created);
+          saveItems.add(created);
+          applied.items++;
+
+        case 'new' || 'update':
+          if (item == null || item.pending.isDeleted) continue;
+
+          var changed = false;
+          if (entry['name'] is String && both(type, Ability.editItems) && newer(entry['name_at'], item.nameChangedAt)) {
+            item.name = (entry['name'] as String).trim();
+            item.nameChangedAt = (entry['name_at'] as num).toInt();
+            item.pending.mark('name', item.nameChangedAt);
+            changed = true;
+          }
+          if (entry['quantity'] is num && both(type, Ability.editItems) && newer(entry['quantity_at'], item.quantityChangedAt)) {
+            item.quantity = (entry['quantity'] as num).toInt().clamp(1, 9999);
+            item.quantityChangedAt = (entry['quantity_at'] as num).toInt();
+            item.pending.mark('quantity', item.quantityChangedAt);
+            changed = true;
+          }
+          if (entry['status'] is String && both(type, Ability.changeStatus) && newer(entry['status_at'], item.statusChangedAt)) {
+            item.status = ItemStatus.fromCode(entry['status'] as String);
+            item.statusChangedAt = (entry['status_at'] as num).toInt();
+            item.pending.mark('status', item.statusChangedAt);
+            changed = true;
+          }
+
+          if (changed) {
+            saveItems.add(item);
+            applied.items++;
+          }
+
+        case 'delete':
+          if (item == null || !both(type, Ability.editItems)) continue;
+
+          _remember(uuid, list: false, listUuid: list.uuid, at: (entry['at'] as num?)?.toInt());
+          if (item.pending.isNew) {
+            list.items.remove(item);
+            removeItems.add(uuid);
+          } else {
+            item.pending.mark(Pending.deleted, (entry['at'] as num?)?.toInt() ?? nowMs());
+            saveItems.add(item);
+          }
+          applied.items++;
+      }
+    }
+
+    if (applied.total > 0) {
+      saveLists.removeWhere((list) => removeLists.contains(list.uuid));
+      saveItems.removeWhere((item) => removeItems.contains(item.uuid) || removeLists.contains(item.listUuid));
+      await _db.apply(saveLists: saveLists, saveItems: saveItems, removeLists: removeLists, removeItems: removeItems);
+
+      notifyListeners();
+      onLocalChange?.call();
+    }
+
+    return applied;
+  }
+
+  /// Note that something was deleted, so that a phone nearby cannot bring it back.
+  void _remember(String uuid, {required bool list, int? type, String? listUuid, int? at}) {
+    final now = nowMs();
+    _tombstones[uuid] = {'at': at ?? now, 'kind': list ? 'list' : 'item', 'type': ?type, 'list': ?listUuid};
+    _tombstones.removeWhere((_, entry) => now - ((entry['at'] as num?)?.toInt() ?? 0) > _tombstoneKeepMs);
+    _db.setMeta(_tombstoneMetaKey, jsonEncode(_tombstones));
+  }
+
   /// Sign-out: nothing of this family stays on the phone.
   Future<void> wipe() async {
     _lists.clear();
+    _tombstones.clear();
     _me = null;
     await _db.wipe();
     notifyListeners();

@@ -204,6 +204,66 @@ Every synced field has its own change time, so two phones editing *different* fi
 - Tombstones for lists in `known_lists` and for items of visible lists.
 - `hidden_from` on a list is included only for users who may manage it.
 
+## Activity
+
+### `GET /activity?after=41`
+
+What others did on the family's lists, for the phone to turn into notifications. Only lists the person may see (their type, not hidden from them), and never their own doing.
+
+```json
+{
+  "data": [
+    { "id": 42, "kind": "item_added", "actor": "Bia", "list_uuid": "...", "list": "Barbecue", "item": "Sausages", "quantity": 4, "at": "2026-10-29T10:21:12+00:00" }
+  ],
+  "last_id": 42
+}
+```
+
+- `kind` is `item_added`, `item_in_cart`, `item_purchased` or `list_created`. Renaming an item or changing its quantity is not news.
+- Send the `last_id` you were given as `after` next time. **With no `after`** the answer is empty and only says where the feed stands, so a new install does not announce the past. A page holds up to 100; when it is full `last_id` stops at the last one sent, so ask again.
+- Events are kept for 14 days. A phone that was off for longer misses the oldest.
+
+The app has no push service behind it (that would need a Firebase account): it asks every 30 seconds while the app is in use and, in the background, about every 15 minutes (Android's shortest interval for scheduled work).
+
+## Nearby sync
+
+With no way to the server, two phones of one family that run **exactly the same version of the app** swap what each has not yet sent to the server. Whatever one receives it keeps as its own unsent change, so whichever phone reaches the server first sends it, and the server settles any clash field by field as it always does. The radio is Google's Nearby Connections (Bluetooth and Wi-Fi, no internet) and is only on while the app is open and the server cannot be reached.
+
+### `POST /me/peer-credential`
+
+Body `{ "public_key": "<base64 Ed25519 public key>" }`. The phone keeps the private half to itself. Answers a credential the phone shows to phones nearby:
+
+```json
+{
+  "credential": "{\"v\":1,\"user_id\":2,\"family_id\":1,\"name\":\"Bia\",\"role\":\"member\",\"key\":\"...\",\"permissions\":{\"1\":{\"can_view\":true,...}},\"iat\":1793000000,\"exp\":1793604800}",
+  "signature": "<base64 Ed25519 signature of the exact credential text>",
+  "server_key": "<base64 public key of the server's signing key>",
+  "expires_at": "2026-11-05T10:00:00+00:00"
+}
+```
+
+The credential says who the phone belongs to and what that person may do per list type, signed by the server (the key derives from `APP_KEY`, so changing it makes every credential in circulation useless). It is valid for 7 days; the app asks again when it is older than 6 hours and the server can be reached. Needs PHP's `sodium` extension.
+
+### What two phones say to each other
+
+Each side sends before it waits, so neither waits for the other to speak first.
+
+1. **hello**: app version (`1.1.0+3`), the credential, its signature, the server's public key and a random nonce. **A different version ends the meeting here** and each phone is told the other's version. A phone nearby that advertises another version is not even connected to.
+2. **proof**: each signs `cestou-peer-v1|<the other's nonce>|<its own nonce>` with its private key, which shows it holds the key its credential names, so a copied credential is useless.
+3. **ready**: the uuids of the lists it holds.
+4. **offer**: what it has not yet sent to the server (new, renamed and deleted lists; new, changed and deleted items, with their per-field times), plus recent deletions.
+5. **done**.
+
+A credential is rejected when its signature is not the phone's own server's, it has expired, or it is for another family. Messages are cut into frames of 16 KB because Nearby carries at most about 32 KB at a time.
+
+### What an offer may contain, and what is taken in
+
+- The sender only offers lists the other person may see (their type), and not one hidden from them. Who a list is hidden from is only known to those who manage it: for any other list the other phone must already hold it.
+- A change is only taken in when **both** people may make it, going by the receiver's own rights and the sender's **signed** credential (never what the sender claims): adding items, editing or deleting them, changing status, managing lists. Anything else is ignored.
+- A field is only changed when the offered time is newer than the one held, and the change then counts as the receiver's own unsent change.
+- What a phone deleted (even something the server never knew) is remembered for 14 days: it is not brought back by a phone that still has it as a new item, and phones that still have it are told it is gone.
+- Meeting again changes nothing: an hour apart unless something changed here since.
+
 ## Family administration
 
 For **family admins** only (anyone else gets `403`). These change other people's accounts, so they need a connection and take effect at once. The rules are the web Family pages' own: a family always keeps an admin, nobody deletes themselves, a list type that still has lists stays, and a new or reset password is the family's name, to be replaced at the first login. Everything is scoped to the admin's family; another family's member or list type is a `404`.
