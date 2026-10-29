@@ -116,35 +116,27 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
           },
         ),
 
-        Row(
-          children: [
+        // The tabs, and (only for the admin, who brings people in and shapes the list types) the button that adds one
+        FamilyTabsBar(
+          tabs: [
             FamilyTabPill(label: context.t('members'), selected: !_showTypes, onTap: () => setState(() => _showTypes = false)),
-            const SizedBox(width: 8),
             FamilyTabPill(label: context.t('list_types'), selected: _showTypes, onTap: () => setState(() => _showTypes = true)),
           ],
+          action: admin && family != null && !_showTypes
+              ? PillButton(
+                  label: context.t('app_family_invite'),
+                  icon: Icons.qr_code_2,
+                  onPressed: () => showFamilyCode(context, family.code, me?.familyName ?? family.familyName),
+                )
+              : admin && _showTypes
+                  ? PillButton(
+                      label: context.t('new_list_type'),
+                      icon: Icons.add,
+                      onPressed: () => askListTypeName(context, title: context.rt('new_list_type'), save: (name) async => repository.addLocalType(name)),
+                    )
+                  : null,
         ),
         const SizedBox(height: 12),
-
-        // Only the admin brings people in (the code is what lets a phone join) and shapes the list types
-        if (admin && family != null && !_showTypes)
-          Align(
-            alignment: Alignment.centerRight,
-            child: PillButton(
-              label: context.t('app_family_invite'),
-              icon: Icons.qr_code_2,
-              onPressed: () => showFamilyCode(context, family.code, me?.familyName ?? family.familyName),
-            ),
-          )
-        else if (admin && _showTypes)
-          Align(
-            alignment: Alignment.centerRight,
-            child: PillButton(
-              label: context.t('new_list_type'),
-              icon: Icons.add,
-              onPressed: () => askListTypeName(context, title: context.rt('new_list_type'), save: (name) async => repository.addLocalType(name)),
-            ),
-          ),
-        if (admin) const SizedBox(height: 12),
 
         if (!_showTypes)
           for (final member in repository.localMembers) ...[_memberCard(context, repository, nearby, member, admin), const SizedBox(height: 8)]

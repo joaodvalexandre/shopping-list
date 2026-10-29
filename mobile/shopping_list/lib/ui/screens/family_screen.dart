@@ -130,17 +130,12 @@ class _FamilyScreenState extends State<FamilyScreen> {
           if (data != null) ...[
             _header(context),
             const SizedBox(height: 12),
-            Row(
-              children: [
+            FamilyTabsBar(
+              tabs: [
                 _tab(context.t('members'), !_showTypes, () => setState(() => _showTypes = false)),
-                const SizedBox(width: 8),
                 _tab(context.t('list_types'), _showTypes, () => setState(() => _showTypes = true)),
               ],
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: PillButton(
+              action: PillButton(
                 label: context.t(_showTypes ? 'new_list_type' : 'new_member'),
                 icon: Icons.add,
                 onPressed: _showTypes ? () => _typeDialog() : () => _openMemberForm(),
@@ -189,7 +184,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
   }
 
   /// The web's two pills: the current one dark, the other light.
-  Widget _tab(String label, bool selected, VoidCallback onTap) => FamilyTabPill(label: label, selected: selected, onTap: onTap);
+  FamilyTabPill _tab(String label, bool selected, VoidCallback onTap) => FamilyTabPill(label: label, selected: selected, onTap: onTap);
 
   Widget _memberCard(BuildContext context, FamilyMember member) {
     final dark = context.isDark;

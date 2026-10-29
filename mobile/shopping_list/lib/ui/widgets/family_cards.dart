@@ -3,6 +3,60 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'common.dart';
 
+/// The Family page's two tabs (members, list types) and the button that adds one: all on one line
+/// when they fit, and the button on a line of its own (to the right) when they do not.
+class FamilyTabsBar extends StatelessWidget {
+  const FamilyTabsBar({super.key, required this.tabs, this.action});
+
+  final List<FamilyTabPill> tabs;
+  final PillButton? action;
+
+  static const _gap = 8.0;
+
+  double _textWidth(BuildContext context, String text, FontWeight weight) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: TextStyle(fontSize: 14, fontWeight: weight)),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+
+    return painter.width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tabsRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < tabs.length; i++) ...[if (i > 0) const SizedBox(width: _gap), tabs[i]],
+      ],
+    );
+
+    final button = action;
+    if (button == null) return Align(alignment: Alignment.centerLeft, child: tabsRow);
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        // (the pills' own padding, the button's icon and padding, and a little to spare)
+        final tabsWidth = tabs.fold<double>(0, (sum, tab) => sum + _textWidth(context, tab.label, FontWeight.w500) + 32) + _gap * (tabs.length - 1);
+        final buttonWidth = _textWidth(context, button.label, FontWeight.w700) + 32 + (button.icon != null ? 28 : 0);
+        final fits = tabsWidth + _gap * 2 + buttonWidth + 8 <= box.maxWidth;
+
+        if (fits) return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [tabsRow, button]);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(alignment: Alignment.centerLeft, child: tabsRow),
+            const SizedBox(height: 12),
+            Align(alignment: Alignment.centerRight, child: button),
+          ],
+        );
+      },
+    );
+  }
+}
+
 /// A person of the family, as a card: their name, a line under it (an email, or whose phone it
 /// is), the pills that say what they are, and the actions. The server family's page and the
 /// offline one both use it, so they look the same.
