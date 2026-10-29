@@ -434,5 +434,6 @@
     "app_offline_leave_not_said": "The hand-over did not reach the other phone. Try again.",
     "app_family_background_help": "To stay connected to the family with the screen off, Android must let this app run in the background. Without it, the phone may stop the app to save battery.",
     "app_family_background_allow": "Allow in the background",
-    "app_member_founder": "Started the family: always an admin, and nobody can change that."
+    "app_member_founder": "Started the family: always an admin, and nobody can change that.",
+    "app_family_online": "Connected to the web app"
 }

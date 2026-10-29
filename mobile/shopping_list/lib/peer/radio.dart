@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
+
+
+import 'package:flutter/foundation.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:nearby_connections/nearby_connections.dart';
@@ -57,6 +59,10 @@ class PluginRadio implements NearbyRadio {
   Future<bool> start({required String name, required RadioEvents events}) async {
     _events = events;
 
+    // What an earlier run (or an earlier try that got halfway) left behind would make this one
+    // fail ("already advertising"): start from nothing
+    await stop();
+
     try {
       final advertising = await _nearby.startAdvertising(
         name,
@@ -77,9 +83,12 @@ class PluginRadio implements NearbyRadio {
         serviceId: serviceId,
       );
 
+      if (!(advertising && discovering)) await stop(); // not half of it
       return advertising && discovering;
-    } catch (_) {
-      return false; // the phone said no: Bluetooth or location is off, or a permission is missing
+    } catch (e) {
+      debugPrint('nearby: could not start: $e');
+      await stop();
+      return false; // the phone said no: Bluetooth or location is off, a permission is missing, or Google's service is still busy with the last run
     }
   }
 

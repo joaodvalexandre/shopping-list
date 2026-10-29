@@ -314,6 +314,32 @@ void main() {
     expect(stranger.phone.repo.itemsOf('L1').map((i) => i.name), isNot(contains('Sausages')));
   });
 
+  test('a radio that would not start is tried again, and then works', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana');
+    ana.radio.refuses = true;
+    ana.service.setForeground(true);
+
+    await until(() => ana.service.radioFailed);
+    expect(ana.radio.started, isFalse);
+
+    ana.radio.refuses = false; // (Google's service is done with the run before)
+    await until(() => ana.radio.started && !ana.service.radioFailed);
+    expect(ana.radio.starts, greaterThan(1));
+  });
+
+  test('a phone that comes back under a new name replaces the link left over from before', () async {
+    final ana = await phoneWithService('aaaa', 2, 'Ana');
+    final rui = await phoneWithService('bbbb', 3, 'Rui');
+    ana.service.setForeground(true);
+    rui.service.setForeground(true);
+    await until(() => ana.service.linkCount == 1 && rui.service.linkCount == 1);
+
+    // Rui was closed and opened again: the radio shows him under another endpoint
+    ana.radio.events!.found('ep-bbbb-again', rui.radio.name);
+
+    await until(() => ana.service.linkCount == 0);
+  });
+
   test('a phone on another version is never connected to, and the person is told', () async {
     final ana = await phoneWithService('aaaa', 2, 'Ana', version: '1.1.0+3');
     final rui = await phoneWithService('bbbb', 3, 'Rui', version: '1.1.0+4');

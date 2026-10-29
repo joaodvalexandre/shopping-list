@@ -63,43 +63,21 @@ class _LocalFamilyScreenState extends State<LocalFamilyScreen> with WidgetsBindi
     return ListView(
       padding: scrollPadding,
       children: [
-        // That this phone is in the family, and how the link is
-        Panel(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Icon(Icons.check_circle, size: 18, color: dark ? Tw.green500 : Tw.green600),
-                const SizedBox(width: 8),
-                Expanded(child: Text(context.t('app_family_you_in'), style: TextStyle(fontSize: 13, color: muted))),
-              ]),
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    (me?.familyName ?? '').isEmpty ? context.t('app_offline_family_unknown') : me!.familyName,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                if (admin)
-                  IconButton(
-                    tooltip: context.t('app_family_rename'),
-                    icon: Icon(Icons.edit_outlined, color: dark ? Tw.amber400 : Tw.amber600),
-                    onPressed: () => askListTypeName(
-                      context,
-                      title: context.rt('app_family_name_title'),
-                      initial: me?.familyName ?? '',
-                      save: (name) async => repository.renameFamily(name),
-                    ),
-                  ),
-              ]),
-              Row(children: [
-                Icon(linkIcon, size: 16, color: linkColor),
-                const SizedBox(width: 6),
-                Expanded(child: Text(linkText, style: TextStyle(fontSize: 12, color: linkColor, fontWeight: FontWeight.w600))),
-              ]),
-            ],
-          ),
+        // That this phone is in the family, as whom, and how the link with the others is
+        FamilyHeader(
+          familyName: me?.familyName ?? '',
+          you: context.t('app_family_you_as', {'name': me?.name ?? ''}),
+          statusText: linkText,
+          statusIcon: linkIcon,
+          statusColor: linkColor,
+          onRename: admin
+              ? () => askListTypeName(
+                    context,
+                    title: context.rt('app_family_name_title'),
+                    initial: me?.familyName ?? '',
+                    save: (name) async => repository.renameFamily(name),
+                  )
+              : null,
         ),
         const SizedBox(height: 12),
 

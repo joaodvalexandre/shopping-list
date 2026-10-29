@@ -127,6 +127,8 @@ class _FamilyScreenState extends State<FamilyScreen> {
         padding: scrollPadding,
         children: [
           if (data != null) ...[
+            _header(context),
+            const SizedBox(height: 12),
             Row(
               children: [
                 _tab(context.t('members'), !_showTypes, () => setState(() => _showTypes = false)),
@@ -160,6 +162,28 @@ class _FamilyScreenState extends State<FamilyScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// That this person is in the family, as whom, and how it is with the web app.
+  Widget _header(BuildContext context) {
+    final me = context.read<Repository>().me;
+    final sync = context.watch<SyncService>();
+
+    final (String text, IconData icon, Color color) = _offline || sync.status == SyncStatus.offline
+        ? (context.t('app_offline'), Icons.cloud_off_outlined, Tw.gray500)
+        : sync.status == SyncStatus.error
+            ? (context.t('app_sync_error'), Icons.error_outline, Tw.red600)
+            : sync.status == SyncStatus.syncing
+                ? (context.t('app_syncing'), Icons.sync, Tw.blue500)
+                : (context.t('app_family_online'), Icons.cloud_done_outlined, Tw.green600);
+
+    return FamilyHeader(
+      familyName: me?.familyName ?? '',
+      you: context.t('app_family_you_as', {'name': me?.name ?? ''}),
+      statusText: text,
+      statusIcon: icon,
+      statusColor: color,
     );
   }
 

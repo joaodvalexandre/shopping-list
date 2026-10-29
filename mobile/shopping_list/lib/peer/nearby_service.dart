@@ -125,6 +125,8 @@ class NearbyService extends ChangeNotifier {
   final _waitingToCall = <String, Timer>{};
   final _failures = <String, int>{};
   final _retryNotBefore = <String, DateTime>{};
+  Timer? _restart;
+  int _startFailures = 0;
   String? _familyTag;
   LocalFamilyKey? _localKey;
 
@@ -247,11 +249,30 @@ class NearbyService extends ChangeNotifier {
       _radioFailed = !started;
       _running = started;
       _set(started ? NearbyState.searching : NearbyState.off);
+
+      // The phone (or Google's service, still busy with the run before) said no: try again, a little
+      // later each time, instead of waiting for something else to make the app look again
+      if (started) {
+        _startFailures = 0;
+      } else {
+        _tryStartingAgain();
+      }
     } finally {
       _starting = false;
       // things may have changed while the radio was starting
       if (_running && !_wanted) _stop();
     }
+  }
+
+  void _tryStartingAgain() {
+    _restart?.cancel();
+
+    final wait = retryAfter * (1 << (_startFailures < 3 ? _startFailures : 3)); // 1, 2, 4, 8 times the first wait
+    _startFailures++;
+
+    _restart = Timer(wait, () {
+      if (_wanted && !_running && !_starting) _start();
+    });
   }
 
   /// Android's question is asked once; after that the answer is only read, so a "no" is not nagged about.
@@ -265,6 +286,8 @@ class NearbyService extends ChangeNotifier {
 
   Future<void> _stop() async {
     _running = false;
+    _restart?.cancel();
+    _startFailures = 0;
     for (final timer in _waitingToCall.values) {
       timer.cancel();
     }
@@ -313,6 +336,14 @@ class NearbyService extends ChangeNotifier {
     if (peer.family != _familyTag) return;
 
     _seen[endpointId] = peer;
+
+    // The same phone under a new name: it was closed and opened again (or its radio was). The link
+    // this phone still has to it belongs to the run before and will never answer: let it go
+    final stale = _linkToDevice(peer.device);
+    if (stale != null && stale.endpointId != endpointId) {
+      radio.disconnect(stale.endpointId);
+      _finish(stale, null, graceful: true);
+    }
 
     if (shouldCall(deviceId, peer.device)) {
       _call(peer);
@@ -400,10 +431,18 @@ class NearbyService extends ChangeNotifier {
     // Only phones of the same family on the same version; one connection per phone; and a limit
     // to how many are kept at once
     final existing = _links[endpointId];
-    final duplicate = peer != null && existing == null && _linkToDevice(peer.device) != null;
+
+    // A phone that calls while this one still holds a link to it under another name has started
+    // again: that link is dead, and the new call replaces it
+    final old = peer == null || existing != null ? null : _linkToDevice(peer.device);
+    if (old != null && peer!.version == appVersion && peer.family == _familyTag) {
+      radio.disconnect(old.endpointId);
+      _finish(old, null, graceful: true);
+    }
+
     final full = existing == null && _links.length >= maxLinks;
 
-    if (peer == null || peer.version != appVersion || peer.family != _familyTag || duplicate || full) {
+    if (peer == null || peer.version != appVersion || peer.family != _familyTag || full) {
       radio.reject(endpointId);
       return;
     }
@@ -649,6 +688,7 @@ class NearbyService extends ChangeNotifier {
   @override
   void dispose() {
     _trigger.removeListener(_evaluate);
+    _restart?.cancel();
     for (final timer in _waitingToCall.values) {
       timer.cancel();
     }
