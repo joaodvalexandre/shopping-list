@@ -80,6 +80,8 @@ class _NameDialogState extends State<_NameDialog> {
   }
 
   Future<void> _submit() async {
+    if (_saving) return; // ("done" on the keyboard, then the button: one save)
+
     final name = _controller.text.trim();
     if (name.isEmpty || name.length > 100) {
       setState(() => _error = context.rt('app_required'));
@@ -99,6 +101,12 @@ class _NameDialogState extends State<_NameDialog> {
       setState(() {
         _saving = false;
         _error = e.isOffline ? context.rt('app_cannot_reach') : e.firstMessage('name');
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString();
       });
     }
   }

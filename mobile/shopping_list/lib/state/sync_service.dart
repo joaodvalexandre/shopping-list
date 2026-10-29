@@ -180,7 +180,13 @@ class SyncService extends ChangeNotifier {
       _unreachable = false;
       _set(SyncStatus.idle);
       await _rememberMarker();
-      await onSynced?.call();
+
+      // (telling the person what others did is not part of syncing: if it fails, the sync still worked)
+      try {
+        await onSynced?.call();
+      } catch (e, stack) {
+        debugPrint('after sync: $e\n$stack');
+      }
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         await auth.tokenRejected();

@@ -137,4 +137,27 @@ void main() {
     down = false;
     await until(() => syncCount == 2 && !watched.serverUnreachable);
   });
+
+  test('a failing notification check after a good sync is not a sync error', () async {
+    var checks = 0;
+
+    final noisy = SyncService(
+      api: apiAnswering((uri) => uri.path.endsWith('/watch') ? {'version': 'a'} : response(visible: [])),
+      repository: Repository(MemoryStore()),
+      auth: _SignedIn(),
+      watchEvery: const Duration(milliseconds: 20),
+      connectivityChanges: const Stream.empty(),
+      onSynced: () async {
+        checks++;
+        throw StateError('the notification plugin failed');
+      },
+    );
+    addTearDown(noisy.dispose);
+
+    await noisy.sync();
+
+    expect(checks, 1);
+    expect(noisy.status, SyncStatus.idle);
+    expect(noisy.lastError, isNull);
+  });
 }

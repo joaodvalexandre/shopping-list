@@ -119,8 +119,15 @@ class AuthState extends ChangeNotifier {
   /// is what the family's other phones use to join it.
   Future<LocalFamily> startLocalFamily({required String myName, required String familyName, String? typeName}) async {
     final memberId = LocalFamilyStore.newMemberId();
-    await repository.startLocal(myName: myName.trim(), familyName: familyName.trim(), memberId: memberId, typeName: typeName ?? Repository.defaultTypeName);
-    final family = await localFamily!.create(myName: myName, familyName: familyName, memberId: memberId);
+    final LocalFamily family;
+
+    try {
+      await repository.startLocal(myName: myName.trim(), familyName: familyName.trim(), memberId: memberId, typeName: typeName ?? Repository.defaultTypeName);
+      family = await localFamily!.create(myName: myName.trim(), familyName: familyName.trim(), memberId: memberId);
+    } catch (_) {
+      await repository.wipe(); // (nothing half-started is left for the next try)
+      rethrow;
+    }
 
     _isLocal = true;
     _set(AuthStatus.signedIn);
@@ -140,7 +147,14 @@ class AuthState extends ChangeNotifier {
       typeName: typeName ?? Repository.defaultTypeName,
       creating: false,
     );
-    final family = await localFamily!.join(myName: myName, code: normalised, memberId: memberId);
+    final LocalFamily family;
+
+    try {
+      family = await localFamily!.join(myName: myName.trim(), code: normalised, memberId: memberId);
+    } catch (_) {
+      await repository.wipe();
+      rethrow;
+    }
 
     _isLocal = true;
     _set(AuthStatus.signedIn);

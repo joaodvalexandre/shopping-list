@@ -56,7 +56,10 @@ class _PasswordFormState extends State<PasswordForm> {
         _errors = {
           for (final field in ['current_password', 'password'])
             if (e.errors[field]?.isNotEmpty ?? false) field: e.errors[field]!.first,
-          if (e.isOffline) 'general': context.rt('app_cannot_reach'),
+          if (e.isOffline)
+            'general': context.rt('app_cannot_reach')
+          else if (!e.errors.containsKey('current_password') && !e.errors.containsKey('password'))
+            'general': e.message,
         };
       });
     } finally {

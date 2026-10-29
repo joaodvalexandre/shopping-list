@@ -56,7 +56,7 @@ php artisan serve --host=0.0.0.0 --port=8000        # reachable from the network
 flutter build apk --debug --dart-define=API_BASE_URL=http://192.168.1.143:8000   # this PC's address on the Wi-Fi
 ```
 
-Install the one APK from `build/app/outputs/flutter-apk/app-debug.apk` on every phone: nearby sync only works between phones on **exactly the same version and build number** (`version:` in `pubspec.yaml`, shown in Settings), so raise the build number (`1.1.0+7`) whenever you change the app and install it everywhere.
+Install the one APK from `build/app/outputs/flutter-apk/app-debug.apk` on every phone: nearby sync only works between phones on **exactly the same version and build number** (`version:` in `pubspec.yaml`, shown in Settings), so raise the build number (`1.0.0+21`) whenever you change the app and install it everywhere.
 
 ```bash
 flutter analyze        # static analysis
@@ -76,3 +76,7 @@ lib/
 The heart is `Repository`: edits mark the fields changed on the phone (`pending`, with the time of each change); `buildPush` turns them into the request; `applyResponse` merges the answer field by field, drops lists that are no longer visible, undoes refused changes and stores the cursor. It is covered by unit tests with an in-memory store (`test/`).
 
 - **Offline families**: on the login page, "Use the app offline" starts a family that lives only on its phones (or joins one with its connect code, shown in Settings on any phone of the family). It never talks to the web app. Phones find each other by the code over Bluetooth, stay connected, and keep each other up to date. See "Offline families" in [docs/api.md](../../docs/api.md).
+
+## Releasing
+
+`flutter build apk --release` makes `build/app/outputs/flutter-apk/app-release.apk`. It is signed with the debug key (see `android/app/build.gradle.kts`), which is enough to install by hand but means updates only install over each other when built on the same machine; give it a proper keystore before putting the app in a store. A release is a GitHub release tagged `v<version>` (for example `v1.0.0`) with that APK attached as `family-shopper-<version>.apk`.

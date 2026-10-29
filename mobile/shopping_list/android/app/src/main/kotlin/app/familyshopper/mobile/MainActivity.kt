@@ -36,7 +36,8 @@ class MainActivity : FlutterActivity() {
             val cache = FlutterEngineCache.getInstance()
             cache.get(ENGINE_ID)?.let { return it }
 
-            val engine = FlutterEngine(app)
+            // (plugins are registered here, once: not by the engine itself, which would do it a second time)
+            val engine = FlutterEngine(app, null, false)
             GeneratedPluginRegistrant.registerWith(engine)
             registerChannels(engine, app)
             registerSound(engine, app)

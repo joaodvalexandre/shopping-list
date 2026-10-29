@@ -17,7 +17,6 @@ extension TextsOnContext on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 }
 
-/// The web's rounded call-to-action button ("New List", "Finish List"...).
 /// The web's two pills for switching between a family's people and its list types: the current
 /// one dark, the other light. Shared by the server family's page and the offline one.
 class FamilyTabPill extends StatelessWidget {
@@ -52,6 +51,7 @@ class FamilyTabPill extends StatelessWidget {
   }
 }
 
+/// The web's rounded call-to-action button ("New List", "Finish List"...).
 class PillButton extends StatelessWidget {
   const PillButton({
     super.key,
@@ -241,5 +241,6 @@ Future<void> syncEverything(BuildContext context) {
   final api = context.read<ApiClient>();
   final sync = context.read<SyncService>();
 
-  return Future.wait([sync.sync(), content.refresh(api)]);
+  // (the texts are a bonus: if they cannot be had, the lists are still refreshed)
+  return Future.wait([sync.sync(), content.refresh(api).catchError((Object _) => false)]);
 }

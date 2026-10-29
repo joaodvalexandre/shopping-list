@@ -15,6 +15,10 @@ import android.os.Process
  * Keeps the app alive while the phone is locked, the app is off screen, or it was closed, so the
  * family's phones stay connected and changes arrive at once. Android only allows that with a
  * notification that stays visible: this is it. It does nothing else; the connection itself is the app's.
+ *
+ * Swiping the app away from the recent apps does not stop it: the app's engine belongs to the process
+ * (see MainActivity), and this service keeps the process alive, so the connections to the family's
+ * phones, and the notifications about what they do, continue. Opening the app shows it again.
  */
 class FamilyLinkService : Service() {
     private var closeLabel = "Close"
@@ -31,15 +35,6 @@ class FamilyLinkService : Service() {
         super.onDestroy()
     }
 
-    /**
-     * The app was swiped away from the recent apps. The app goes on: its engine belongs to the
-     * process (see MainActivity), and this service keeps the process alive, so the connections to the
-     * family's phones, and the notifications about what they do, continue. Opening the app shows it again.
-     */
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-    }
-
     /** New words for the notification, while the service runs (no need to start anything again). */
     fun refresh(title: String, text: String, close: String? = null) {
         if (close != null) closeLabel = close
@@ -47,12 +42,6 @@ class FamilyLinkService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
         // "Close" on the notification: the app stops completely, with its connections and its checks, until
         // it is opened again (which starts it all again). The mark keeps the scheduled checks quiet meanwhile.
         if (intent?.action == ACTION_QUIT) {
@@ -68,10 +57,16 @@ class FamilyLinkService : Service() {
         intent?.getStringExtra(EXTRA_CLOSE)?.let { closeLabel = it }
         val notification = build(title, text)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            // Android refused (a permission, or the app is not in a state to start it): no service, but no crash
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         // Nothing to come back to if the app itself is gone: the connection lives in it
@@ -118,7 +113,6 @@ class FamilyLinkService : Service() {
 
     companion object {
         var instance: FamilyLinkService? = null
-        const val ACTION_STOP = "app.familyshopper.mobile.STOP_FAMILY_LINK"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
         const val EXTRA_CLOSE = "close"

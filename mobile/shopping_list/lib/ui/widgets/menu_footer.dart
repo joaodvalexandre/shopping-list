@@ -37,7 +37,10 @@ Future<void> openLink(BuildContext context, MenuLink link) async {
   final url = link.url;
   if (url == null) return;
 
-  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  // A link the backoffice got wrong (or a phone with no browser) is not worth an error
+  try {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } catch (_) {}
 }
 
 /// The footer links arranged in the backoffice: columns for headings with links
