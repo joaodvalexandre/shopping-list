@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../data/api_client.dart';
 import '../data/repository.dart';
+import '../peer/local_family.dart';
 import 'settings_state.dart';
 
 enum AuthStatus { loading, signedOut, mustChangePassword, signedIn }
@@ -18,12 +19,20 @@ class AuthState extends ChangeNotifier {
     required this.repository,
     required this.settings,
     FlutterSecureStorage? storage,
+    this.localFamily,
   }) : _storage = storage ?? const FlutterSecureStorage();
 
   final ApiClient api;
   final Repository repository;
   final SettingsState settings;
   final FlutterSecureStorage _storage;
+
+  /// Where a local family (no server, ever) is kept, if this phone belongs to one.
+  final LocalFamilyStore? localFamily;
+  bool _isLocal = false;
+
+  /// This phone belongs to a local family: it never talks to the server, only to phones nearby.
+  bool get isLocal => _isLocal;
 
   static const tokenKey = 'device_token';
   static const _stageKey = 'password_change_required';
@@ -37,6 +46,12 @@ class AuthState extends ChangeNotifier {
 
   Future<void> init() async {
     api.baseUrl = settings.serverUrl;
+
+    if (await localFamily?.current() != null) {
+      _isLocal = true;
+      _set(AuthStatus.signedIn);
+      return;
+    }
 
     final token = await _readToken();
     if (token == null) {
@@ -100,12 +115,39 @@ class AuthState extends ChangeNotifier {
     _temporaryPassword = null;
   }
 
+  /// Start a family that lives only on phones: no account, no server. The code it is given
+  /// is what the family's other phones use to join it.
+  Future<LocalFamily> startLocalFamily({required String myName, required String familyName}) async {
+    await repository.startLocal(myName: myName.trim(), familyName: familyName.trim());
+    final family = await localFamily!.create(myName: myName, familyName: familyName);
+
+    _isLocal = true;
+    _set(AuthStatus.signedIn);
+    return family;
+  }
+
+  /// Join a local family by its code. Throws [FormatException] when [code] cannot be one.
+  Future<LocalFamily> joinLocalFamily({required String myName, required String code}) async {
+    final normalised = LocalFamilyCodes.normalise(code);
+    if (normalised == null) throw const FormatException('not a connect code');
+
+    await repository.startLocal(myName: myName.trim(), familyName: '');
+    final family = await localFamily!.join(myName: myName, code: normalised);
+
+    _isLocal = true;
+    _set(AuthStatus.signedIn);
+    return family;
+  }
+
   /// Sign out here (and tell the server, if it can be reached) and forget the family's data.
+  /// A local family is left the same way: its lists stay on the other phones, not on this one.
   Future<void> logout() async {
-    try {
-      await api.logout();
-    } on ApiException {
-      // offline or already revoked: signing out locally is what matters
+    if (!_isLocal) {
+      try {
+        await api.logout();
+      } on ApiException {
+        // offline or already revoked: signing out locally is what matters
+      }
     }
     await _signedOut();
   }
@@ -114,6 +156,8 @@ class AuthState extends ChangeNotifier {
   Future<void> tokenRejected() => _signedOut();
 
   Future<void> _signedOut() async {
+    _isLocal = false;
+    await localFamily?.clear();
     _temporaryPassword = null;
     api.token = null;
     await _storage.delete(key: tokenKey);

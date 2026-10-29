@@ -18,6 +18,9 @@ class _SignedIn implements AuthState {
   AuthStatus get status => AuthStatus.signedIn;
 
   @override
+  bool get isLocal => false;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

@@ -74,3 +74,5 @@ lib/
 ```
 
 The heart is `Repository`: edits mark the fields changed on the phone (`pending`, with the time of each change); `buildPush` turns them into the request; `applyResponse` merges the answer field by field, drops lists that are no longer visible, undoes refused changes and stores the cursor. It is covered by unit tests with an in-memory store (`test/`).
+
+- **Offline families**: on the login page, "Use the app offline" starts a family that lives only on its phones (or joins one with its connect code, shown in Settings on any phone of the family). It never talks to the web app. Phones find each other by the code over Bluetooth, stay connected, and keep each other up to date. See "Offline families" in [docs/api.md](../../docs/api.md).

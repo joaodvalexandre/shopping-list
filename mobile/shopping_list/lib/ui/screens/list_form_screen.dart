@@ -89,19 +89,21 @@ class _ListFormScreenState extends State<ListFormScreen> {
                     return text.isEmpty || text.length > 255 ? context.rt('app_required') : null;
                   },
                 ),
-                const SizedBox(height: 16),
-                Text(context.t('list_type'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
-                const SizedBox(height: 4),
-                if (_editing)
-                  Text(repository.listTypeName(_typeId ?? 0), style: const TextStyle(fontSize: 16))
-                else
-                  DropdownButtonFormField<int>(
-                    initialValue: _typeId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(isDense: true),
-                    items: [for (final id in types) DropdownMenuItem(value: id, child: Text(repository.listTypeName(id)))],
-                    onChanged: (value) => setState(() => _typeId = value),
-                  ),
+                if (!repository.isLocal) ...[
+                  const SizedBox(height: 16),
+                  Text(context.t('list_type'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
+                  const SizedBox(height: 4),
+                  if (_editing)
+                    Text(repository.listTypeName(_typeId ?? 0), style: const TextStyle(fontSize: 16))
+                  else
+                    DropdownButtonFormField<int>(
+                      initialValue: _typeId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(isDense: true),
+                      items: [for (final id in types) DropdownMenuItem(value: id, child: Text(repository.listTypeName(id)))],
+                      onChanged: (value) => setState(() => _typeId = value),
+                    ),
+                ],
                 if (members.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Text(context.t('hidden_from'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),

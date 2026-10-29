@@ -127,6 +127,15 @@ Future<void> signOut(BuildContext context) async {
   final auth = context.read<AuthState>();
   final settings = context.read<SettingsState>();
 
+  // A local family: its lists stay on the other phones, and go from this one
+  if (auth.isLocal) {
+    final leave = await confirm(context, settings.t('app_offline_leave_confirm'), action: settings.t('app_offline_leave'));
+    if (!leave) return;
+
+    await auth.logout();
+    return;
+  }
+
   if (repository.pendingCount > 0) {
     final proceed = await confirm(
       context,

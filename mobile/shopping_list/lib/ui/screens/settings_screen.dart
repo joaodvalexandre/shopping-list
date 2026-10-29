@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 
 import '../../data/api_client.dart';
 import '../../data/repository.dart';
+import '../../peer/local_family.dart';
 import '../../peer/nearby_service.dart';
+import '../../state/auth_state.dart';
 import '../../state/notification_service.dart';
 import '../../state/settings_state.dart';
 import '../../state/sync_service.dart';
@@ -15,6 +17,7 @@ import '../widgets/common.dart';
 import '../widgets/menu_footer.dart';
 import '../widgets/password_form.dart';
 import '../widgets/top_bar.dart';
+import 'offline_start_screen.dart';
 
 /// Profile, language, password, devices and sync: the web's settings page plus what only a phone has.
 class SettingsScreen extends StatefulWidget {
@@ -31,7 +34,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _devices = _loadDevices();
+    // A local family never talks to the server, not even to list devices
+    _devices = context.read<AuthState>().isLocal ? Future.value(const []) : _loadDevices();
     _notifications = context.read<NotificationService>().enabled;
   }
 
@@ -46,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final sync = context.watch<SyncService>();
     final accountLinks = [...context.menuLinks('navbar'), ...context.menuLinks('user_menu')];
     final me = repository.me;
+    final local = context.watch<AuthState>().isLocal;
     final dark = context.isDark;
     final muted = dark ? Tw.gray400 : Tw.gray500;
 
@@ -66,9 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(context.t('profile'), style: const TextStyle(fontSize: 20)),
                 const SizedBox(height: 12),
                 _row(context.t('name'), me?.name ?? ''),
-                _row(context.t('email'), me?.email ?? ''),
-                _row(context.t('family'), me?.familyName ?? ''),
-                _row(context.t('role'), me == null ? '' : context.t(me.isAdmin ? 'role_admin' : 'role_member')),
+                if (!local) _row(context.t('email'), me?.email ?? ''),
+                _row(context.t('family'), (me?.familyName ?? '').isEmpty && local ? context.t('app_offline_family_unknown') : me?.familyName ?? ''),
+                if (!local) _row(context.t('role'), me == null ? '' : context.t(me.isAdmin ? 'role_admin' : 'role_member')),
                 const SizedBox(height: 12),
                 Text(context.t('language'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
                 const SizedBox(height: 4),
@@ -87,11 +92,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
 
-          const Panel(padding: EdgeInsets.all(20), child: PasswordForm()),
-          const SizedBox(height: 12),
+          // The family's code (local families only)
+          if (local) ...[
+            _localFamilyPanel(context, muted),
+            const SizedBox(height: 12),
+          ],
+
+          if (!local) ...[
+            const Panel(padding: EdgeInsets.all(20), child: PasswordForm()),
+            const SizedBox(height: 12),
+          ],
 
           // Notifications about what others did
-          Panel(
+          if (!local) Panel(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,14 +128,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          if (!local) const SizedBox(height: 12),
 
           // Phones of the family nearby, for when there is no way to the server
           _nearbyPanel(context, muted),
           const SizedBox(height: 12),
 
           // Sync
-          Panel(
+          if (!local) Panel(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,10 +160,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          if (!local) const SizedBox(height: 12),
 
           // Devices
-          Panel(
+          if (!local) Panel(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          if (!local) const SizedBox(height: 12),
 
           // Links arranged in the backoffice (About, Privacy...); pages open inside the app
           if (accountLinks.any((link) => link.goesSomewhere))
@@ -198,9 +211,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           Align(
             alignment: Alignment.center,
-            child: FilledButton(onPressed: () => signOut(context), child: Text(context.t('logout').toUpperCase())),
+            child: FilledButton(
+              onPressed: () => signOut(context),
+              child: Text(context.t(local ? 'app_offline_leave' : 'logout').toUpperCase()),
+            ),
           ),
           const MenuFooter(),
+        ],
+      ),
+    );
+  }
+
+  /// The family's code, for the others to join with, and what makes the family local.
+  Widget _localFamilyPanel(BuildContext context, Color muted) {
+    final code = context.read<AuthState>().localFamily?.currentSync;
+
+    return Panel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.t('app_offline_family_section'), style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 4),
+          Text(context.t('app_offline_mode_note'), style: TextStyle(fontSize: 12, color: muted)),
+          const SizedBox(height: 12),
+          if (code != null) ...[
+            Text(context.t('app_offline_code'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: context.isDark ? Tw.gray300 : Tw.gray700)),
+            const SizedBox(height: 4),
+            SelectableText(LocalFamilyCodes.format(code.code), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: 2)),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: PillButton(label: context.t('app_offline_show_code'), icon: Icons.qr_code_2, onPressed: () => showFamilyCode(context, code.code)),
+            ),
+          ],
         ],
       ),
     );

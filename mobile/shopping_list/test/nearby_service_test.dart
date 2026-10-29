@@ -2,10 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopping_list/data/models.dart';
+import 'package:shopping_list/data/repository.dart';
+import 'package:shopping_list/peer/identity.dart';
+import 'package:shopping_list/peer/local_family.dart';
 import 'package:shopping_list/peer/frames.dart';
 import 'package:shopping_list/peer/nearby_service.dart';
 import 'package:shopping_list/peer/radio.dart';
 
+import 'support/fakes.dart';
+import 'support/memory_store.dart';
 import 'support/peer_support.dart';
 
 /// The air between phones: radios in range of each other find and call each other.
@@ -403,5 +408,87 @@ void main() {
 
     expect(whole, big);
     expect(assembler.add(Uint8List.fromList([1, 2, 3])), isNull);   // noise is ignored
+  });
+
+  group('a local family', () {
+    /// A phone of a local family with its radio and service: no server, no credential.
+    Future<({Repository repo, NearbyService service, FakeRadio radio, Trigger trigger})> localPhone(
+      String device,
+      String name, {
+      String? code,
+      String familyName = '',
+    }) async {
+      final store = MemoryStore();
+      final repo = Repository(store);
+      final family = LocalFamilyStore(store);
+
+      await repo.startLocal(myName: name, familyName: familyName);
+      if (code == null) {
+        await family.create(myName: name, familyName: familyName);
+      } else {
+        await family.join(myName: name, code: code);
+      }
+
+      final radio = FakeRadio(air, 'ep-$device');
+      final trigger = Trigger();
+      final service = NearbyService(
+        radio: radio,
+        identity: PeerIdentity(secrets: MemorySecrets(), store: store),
+        repository: repo,
+        prefs: prefs,
+        appVersion: '1.1.0+7',
+        deviceId: device,
+        trigger: trigger,
+        offline: () => true,
+        signedIn: () => true,
+        personName: () => name,
+        hasPermissions: () async => true,
+        localFamily: family,
+        meetAgainAfter: const Duration(hours: 1),
+        callAfterWaiting: const Duration(milliseconds: 100),
+        retryAfter: const Duration(milliseconds: 50),
+      );
+
+      return (repo: repo, service: service, radio: radio, trigger: trigger);
+    }
+
+    test('phones with the same code find each other, sync, and stay connected for the next change', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final code = (await ana.service.localFamily!.current())!.code;
+      final bia = await localPhone('bbbb', 'Bia', code: code);
+
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 2);
+
+      ana.service.setForeground(true);
+      bia.service.setForeground(true);
+
+      await until(() => bia.repo.lists.length == 1 && bia.repo.itemsOf(shop.uuid).length == 1);
+      await until(() => ana.service.state == NearbyState.connected && bia.service.state == NearbyState.connected);
+      expect(bia.repo.me!.familyName, 'Silva');
+
+      // a later change goes over the same connection, either way
+      final connections = ana.radio.calledTo.length + bia.radio.calledTo.length;
+      bia.repo.addItem(shop.uuid, name: 'Eggs', quantity: 6);
+      bia.trigger.fire();
+      await until(() => ana.repo.itemsOf(shop.uuid).any((i) => i.name == 'Eggs'));
+
+      expect(ana.radio.calledTo.length + bia.radio.calledTo.length, connections);
+    });
+
+    test('a phone with another code is not even connected to', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final stranger = await localPhone('bbbb', 'Eve', familyName: 'Costa');
+      ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+
+      ana.service.setForeground(true);
+      stranger.service.setForeground(true);
+      await until(() => ana.radio.started && stranger.radio.started);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      expect(ana.radio.calledTo, isEmpty);
+      expect(stranger.radio.calledTo, isEmpty);
+      expect(stranger.repo.lists, isEmpty);
+    });
   });
 }

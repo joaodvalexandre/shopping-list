@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/menu_footer.dart';
 import '../widgets/top_bar.dart';
+import 'offline_start_screen.dart';
 
 /// The web's guest layout: language and theme on top, a centred card with the logo.
 class GuestScaffold extends StatelessWidget {
@@ -154,6 +155,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: _busy
                     ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : Text(context.t('login').toUpperCase()),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: _busy ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OfflineStartScreen())),
+                child: Text(context.t('app_offline_use').toUpperCase()),
               ),
               const SizedBox(height: 12),
               Text(

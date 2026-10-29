@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/repository.dart';
 import 'frames.dart';
 import 'identity.dart';
+import 'local_family.dart';
 import 'radio.dart';
 import 'session.dart';
 
@@ -60,6 +61,7 @@ class NearbyService extends ChangeNotifier {
     this.callAfterWaiting = const Duration(seconds: 12),
     this.retryAfter = const Duration(seconds: 5),
     this.linkTimeout = const Duration(seconds: 45),
+    this.localFamily,
   }) : _trigger = trigger {
     _trigger.addListener(_evaluate);
   }
@@ -86,6 +88,10 @@ class NearbyService extends ChangeNotifier {
   /// After a call that did not work (Bluetooth is not always quick): the first wait, which grows with each failure.
   final Duration retryAfter;
 
+  /// Set when this phone belongs to a local family (no server): then the connect code, not a
+  /// credential from the server, is what makes phones one family.
+  final LocalFamilyStore? localFamily;
+
   /// A connection that has neither finished nor failed by then is dropped, so it cannot block the next one.
   final Duration linkTimeout;
 
@@ -107,6 +113,8 @@ class NearbyService extends ChangeNotifier {
   final _retryNotBefore = <String, DateTime>{};
   Timer? _watchdog;
   String? _familyTag;
+  LocalFamily? _local;
+  LocalFamilyKey? _localKey;
 
   _Link? _link;
 
@@ -165,18 +173,21 @@ class NearbyService extends ChangeNotifier {
     }
   }
 
+  /// Goes up whenever something changes here that a phone nearby does not have yet.
+  int get _changeMark => repository.isLocal ? repository.revision : repository.pendingCount;
+
   /// Something changed here since the last meeting with a phone in sight: no need to wait for the next round.
   void _meetSoonIfChanged() {
     final link = _link;
     if (link != null) {
       // Already connected to a phone: a new round over the same connection
-      if (_isIdle(link) && repository.pendingCount != _pendingAtMeeting[link.peer.device]) _runRound(link);
+      if (_isIdle(link) && _changeMark != _pendingAtMeeting[link.peer.device]) _runRound(link);
       return;
     }
 
     for (final peer in _seen.values) {
       final before = _pendingAtMeeting[peer.device];
-      if (before != null && before != repository.pendingCount) {
+      if (before != null && before != _changeMark) {
         _call(peer);
         return;
       }
@@ -194,12 +205,23 @@ class NearbyService extends ChangeNotifier {
       }
       _permissionDenied = false;
 
-      // Without a credential from the server nobody can be trusted: it is fetched whenever the server is reachable
-      if (await identity.credential() == null) {
-        _set(NearbyState.off);
-        return;
+      final local = await localFamily?.current();
+      if (local != null) {
+        // A local family: whoever knows the code belongs
+        _local = local;
+        _localKey = await LocalFamilyKey.derive(local.code);
+        _familyTag = await _localKey!.tag();
+      } else {
+        _local = null;
+        _localKey = null;
+
+        // Without a credential from the server nobody can be trusted: it is fetched whenever the server is reachable
+        if (await identity.credential() == null) {
+          _set(NearbyState.off);
+          return;
+        }
+        _familyTag = await identity.familyTag();
       }
-      _familyTag = await identity.familyTag();
 
       final started = await radio.start(name: endpointName, events: _events());
       _radioFailed = !started;
@@ -295,7 +317,7 @@ class NearbyService extends ChangeNotifier {
   bool _due(NearbyPeer peer) {
     final last = _lastMeeting[peer.device];
     if (last == null) return true;
-    if (repository.pendingCount != _pendingAtMeeting[peer.device]) return true;
+    if (_changeMark != _pendingAtMeeting[peer.device]) return true;
     return DateTime.now().difference(last) >= meetAgainAfter;
   }
 
@@ -424,17 +446,28 @@ class NearbyService extends ChangeNotifier {
     final channel = link.channel = _RadioChannel(nextId: () => link.messageIds++)
       ..sender = (frame) => radio.send(link.endpointId, frame);
 
-    final session = PeerSession(
-      identity: identity,
-      repository: repository,
-      appVersion: appVersion,
-      channel: channel,
-      displayName: personName(),
-    );
+    final key = _localKey;
+    final Future<PeerResult> Function() meet = key != null
+        ? LocalPeerSession(
+            key: key,
+            repository: repository,
+            appVersion: appVersion,
+            channel: channel,
+            displayName: personName(),
+            familyName: _local?.familyName ?? '',
+            onFamilyName: _adoptFamilyName,
+          ).run
+        : PeerSession(
+            identity: identity,
+            repository: repository,
+            appVersion: appVersion,
+            channel: channel,
+            displayName: personName(),
+          ).run;
 
     PeerResult result;
     try {
-      result = await session.run();
+      result = await meet();
     } catch (_) {
       result = PeerResult(PeerStatus.protocol);
     }
@@ -452,6 +485,15 @@ class NearbyService extends ChangeNotifier {
     _finish(link, result);
   }
 
+  /// A phone that joined by code learns the family's name from the first phone it meets.
+  Future<void> _adoptFamilyName(String name) async {
+    final adopted = await localFamily?.adoptFamilyName(name);
+    if (adopted == null) return;
+
+    _local = adopted;
+    await repository.setFamilyName(adopted.familyName);
+  }
+
   void _roundDone(_Link link, PeerResult result) {
     link.rounds++;
     _watchdog?.cancel();
@@ -460,7 +502,7 @@ class NearbyService extends ChangeNotifier {
     _failures.remove(peer.device);
     _retryNotBefore.remove(peer.device);
     _lastMeeting[peer.device] = DateTime.now();
-    _pendingAtMeeting[peer.device] = repository.pendingCount;
+    _pendingAtMeeting[peer.device] = _changeMark;
     _lastResult = result;
     _lastMeetingAt = DateTime.now();
 
@@ -508,7 +550,7 @@ class NearbyService extends ChangeNotifier {
       _retryNotBefore.remove(peer.device);
       if (result != null) {
         _lastMeeting[peer.device] = DateTime.now();
-        _pendingAtMeeting[peer.device] = repository.pendingCount;
+        _pendingAtMeeting[peer.device] = _changeMark;
       }
 
       // The connection is over (let go or lost): the next call is soon, to be connected again

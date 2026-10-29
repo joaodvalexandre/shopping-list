@@ -326,3 +326,12 @@ Public (no token needed). What the phone keeps in its own database apart from th
 ### `GET /health`
 
 Public. `{"status": "ok", "time": "..."}`. Use it to tell whether the server is reachable.
+
+## Offline families (the app with no web app)
+
+The app can be used with no account and no server: on the login page, "Use the app offline". A phone either **starts a family** (its own name and the family's) and is given a **connect code**, or **joins** one by typing a code and its own name. Such a family exists only on its phones: it is never created on the server, and the phone never makes a request to it (no sync, no content refresh, no notifications). Nothing in this API is involved.
+
+- The **code** is 12 letters and digits (60 bits). It is turned into a key (PBKDF2-HMAC-SHA256); the key gives a 4-byte tag in the name the phone advertises, so phones with another code are not even connected to, and a mutual proof (HMAC over both sides' challenges), so a phone that does not know the code cannot take part.
+- A meeting is the same hello / proof / ready / offer / done as for server families, over Nearby Connections, and the connection stays open between rounds. There is no server to settle clashes: the phones **compare what each holds** (the time each list name and item field was last changed, and what was deleted) and send only what the other lacks or has older. Per field the newest change wins; a deletion wins over later edits and is remembered 90 days; an item in the cart is not deleted.
+- Everyone in a local family may do everything (one list type, no rights, no hidden lists). The family's name is learned from the first phone a joining phone meets.
+- Phones only exchange with the very same app version, as always. Leaving a local family removes its lists from that phone only.

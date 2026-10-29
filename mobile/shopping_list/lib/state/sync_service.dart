@@ -72,6 +72,7 @@ class SyncService extends ChangeNotifier {
   }
 
   void start() {
+    if (auth.isLocal) return; // a local family never talks to the server
     // While the server is known to be down the watcher tries it every few seconds, so no need to pile on
     _periodic ??= Timer.periodic(const Duration(seconds: 30), (_) {
       if (!(_unreachable && _watcher != null)) sync();
@@ -146,7 +147,7 @@ class SyncService extends ChangeNotifier {
 
   /// After an edit: wait a moment, so several quick edits go in one round trip.
   void requestSoon() {
-    if (auth.status != AuthStatus.signedIn) return;
+    if (auth.status != AuthStatus.signedIn || auth.isLocal) return;
     // With the server down the change waits (phones nearby may take it); the watcher syncs when it is back
     if (_unreachable && _watcher != null) return;
     _debounce?.cancel();
@@ -154,7 +155,7 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> sync() async {
-    if (auth.status != AuthStatus.signedIn) return;
+    if (auth.status != AuthStatus.signedIn || auth.isLocal) return;
     if (_running) {
       _again = true; // something changed meanwhile: go round once more afterwards
       return;

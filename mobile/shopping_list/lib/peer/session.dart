@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import '../core/time.dart';
 import '../data/peer_info.dart';
 import '../data/repository.dart';
 import 'identity.dart';
+import 'local_family.dart';
 
 /// A line to a phone nearby that carries whole messages. Nearby Connections in the app (which
 /// cuts them into pieces); a pair of in-memory channels in tests.
@@ -241,5 +243,124 @@ class _Inbox {
     if (message['t'] != type) throw _Unexpected();
 
     return message;
+  }
+}
+
+/// The meeting of two phones of a **local** family: no server, so no credential. What proves a
+/// phone belongs is that it knows the connect code, shown without being told: each side answers
+/// the other's challenge with a proof only the code makes. Then they compare what each holds and
+/// swap only what the other lacks or has older (the same hello / proof / ready / offer / done).
+///
+/// Everyone in a local family may do everything: there are no rights to check.
+class LocalPeerSession {
+  LocalPeerSession({
+    required this.key,
+    required this.repository,
+    required this.appVersion,
+    required this.channel,
+    this.displayName = '',
+    this.familyName = '',
+    this.onFamilyName,
+    this.timeout = const Duration(seconds: 20),
+  });
+
+  final LocalFamilyKey key;
+  final Repository repository;
+  final String appVersion;
+  final PeerChannel channel;
+  final String displayName;
+  final String familyName;
+
+  /// Told the family's name when the other phone has one and this one does not yet.
+  final Future<void> Function(String name)? onFamilyName;
+  final Duration timeout;
+
+  static const protocol = 1;
+
+  Future<PeerResult> run() async {
+    final inbox = _Inbox();
+    final subscription = channel.messages.listen(inbox.add, onDone: inbox.close, onError: (_) => inbox.close());
+
+    try {
+      return await _meet(inbox);
+    } on _Bye catch (bye) {
+      return PeerResult(PeerSession._statusOf(bye.reason), theirVersion: bye.detail);
+    } on TimeoutException {
+      return PeerResult(PeerStatus.timeout);
+    } on _Disconnected {
+      return PeerResult(PeerStatus.disconnected);
+    } on _Unexpected {
+      return PeerResult(PeerStatus.protocol);
+    } finally {
+      await subscription.cancel();
+    }
+  }
+
+  Future<PeerResult> _meet(_Inbox inbox) async {
+    final random = Random.secure();
+    final myNonce = base64.encode([for (var i = 0; i < 16; i++) random.nextInt(256)]);
+
+    // 1. hello
+    await channel.send({
+      't': 'hello',
+      'protocol': protocol,
+      'mode': 'local',
+      'version': appVersion,
+      'name': displayName,
+      'family': familyName,
+      'nonce': myNonce,
+    });
+
+    final hello = await inbox.receive('hello', timeout);
+    final theirVersion = hello['version']?.toString();
+
+    if (theirVersion != appVersion || hello['protocol'] != protocol) {
+      await _bye('version', theirVersion);
+      return PeerResult(PeerStatus.versionMismatch, theirVersion: theirVersion);
+    }
+    if (hello['mode'] != 'local') {
+      await _bye('differentFamily');
+      return PeerResult(PeerStatus.differentFamily);
+    }
+
+    final theirNonce = hello['nonce'] as String? ?? '';
+
+    // 2. proof: each answers the other's challenge, which only the code makes possible
+    await channel.send({'t': 'proof', 'mac': await key.prove('$theirNonce|$myNonce')});
+
+    final theirProof = await inbox.receive('proof', timeout);
+    if (theirProof['mac'] != await key.prove('$myNonce|$theirNonce')) {
+      await _bye('badProof');
+      return PeerResult(PeerStatus.invalidCredential);
+    }
+
+    // 3. ready: what each holds, in a few numbers
+    await channel.send({'t': 'ready', 'digest': repository.buildLocalDigest()});
+    final ready = await inbox.receive('ready', timeout);
+
+    // 4. offer: only what the other lacks or has older
+    final offer = repository.buildLocalDelta(asMap(ready['digest']));
+    await channel.send({'t': 'offer', ...offer});
+    final sent = (offer['lists'] as List).length + (offer['items'] as List).length + (offer['gone'] as List).length;
+
+    final theirOffer = await inbox.receive('offer', timeout);
+    final applied = await repository.applyLocalDelta(theirOffer);
+
+    final theirFamily = hello['family']?.toString() ?? '';
+    if (familyName.isEmpty && theirFamily.isNotEmpty) await onFamilyName?.call(theirFamily);
+
+    // 5. done (the other may already have gone: that is fine)
+    await channel.send({'t': 'done'});
+    try {
+      await inbox.receive('done', const Duration(seconds: 3));
+    } catch (_) {}
+
+    return PeerResult(PeerStatus.done, peerName: hello['name']?.toString(), sent: sent, applied: applied);
+  }
+
+  Future<void> _bye(String reason, [String? detail]) async {
+    try {
+      await channel.send({'t': 'bye', 'reason': reason, 'detail': ?detail});
+    } catch (_) {}
   }
 }

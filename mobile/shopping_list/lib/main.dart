@@ -10,6 +10,7 @@ import 'data/api_client.dart';
 import 'data/local_db.dart';
 import 'data/repository.dart';
 import 'peer/identity.dart';
+import 'peer/local_family.dart';
 import 'peer/nearby_service.dart';
 import 'peer/radio.dart';
 import 'state/auth_state.dart';
@@ -39,7 +40,8 @@ Future<void> main() async {
 
   final api = ApiClient(baseUrl: settings.serverUrl)..language = settings.language;
   settings.addListener(() => api.language = settings.language);
-  final auth = AuthState(api: api, repository: repository, settings: settings);
+  final localFamily = LocalFamilyStore(db);
+  final auth = AuthState(api: api, repository: repository, settings: settings, localFamily: localFamily);
 
   // Notifications about what others did: the plugin, and the service that asks the server
   final sink = await LocalNoticeSink.create(onTap: (uuid) => openListFromNotification(uuid, repository, auth));
@@ -73,9 +75,11 @@ Future<void> main() async {
     appVersion: '${info.version}+${info.buildNumber}',
     deviceId: _deviceId(prefs),
     trigger: Listenable.merge([sync, auth]),
-    offline: () => sync.serverUnreachable,
+    // A local family has no server to reach: it always looks for its phones
+    offline: () => auth.isLocal || sync.serverUnreachable,
     signedIn: () => auth.status == AuthStatus.signedIn,
     personName: () => repository.me?.name ?? '',
+    localFamily: localFamily,
   );
 
   await auth.init();
@@ -201,6 +205,9 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     final repository = context.read<Repository>();
     final auth = context.read<AuthState>();
 
+    // News from the server: nothing to ask for a family that has none
+    if (auth.isLocal) return;
+
     await notifications.askPermissionOnce();
     await scheduleBackgroundChecks();
 
@@ -212,7 +219,11 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   }
 
   /// Texts, pages and links from the server; quiet when it cannot be reached.
-  void _refreshContent() => context.read<ContentService>().refresh(context.read<ApiClient>());
+  /// Never for a local family, which does not talk to the server at all.
+  void _refreshContent() {
+    if (context.read<AuthState>().isLocal) return;
+    context.read<ContentService>().refresh(context.read<ApiClient>());
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
