@@ -277,11 +277,17 @@ class FamilyQr extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-      child: QrImageView(
-        data: LocalFamilyInvite.encode(code, familyName),
-        size: size,
-        backgroundColor: Colors.white,
-        errorCorrectionLevel: QrErrorCorrectLevel.M,
+      // A fixed box: the QR widget is built with a LayoutBuilder, which cannot be measured by a dialog
+      // that sizes itself to its content (it then draws nothing at all)
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: QrImageView(
+          data: LocalFamilyInvite.encode(code, familyName),
+          size: size,
+          backgroundColor: Colors.white,
+          errorCorrectionLevel: QrErrorCorrectLevel.M,
+        ),
       ),
     );
   }
