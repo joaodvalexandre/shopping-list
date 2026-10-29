@@ -1,91 +1,56 @@
 # Shopping List - mobile app
 
-Flutter companion app for the Shopping List web app (see the [project README](../../README.md)).
+The Android app of the Shopping List web app (see the [project README](../../README.md)). It signs in with the same account as the web, keeps the family's lists on the phone so it works **offline**, and syncs with the server through the [mobile API](../../docs/api.md).
 
-> **Status: being reworked.** Today the app is a standalone, local-only shopping list. Its old web-sync code talks to API endpoints that were **removed** (they served every family's data without authentication), so **sync with the web app is currently disabled**. The replacement API is ready and documented; the app is the next piece of work. See [What is planned](#what-is-planned).
+## What it does
 
-## What works today
+- **Sign in** with email and password; one token per device, kept in the Android keystore and revocable from the web or from **Settings > My devices**.
+- **First login**: a person on a temporary password (the family name) gets a screen of their own, in the login's style, asking only for the **new password and its confirmation**. The app sends the temporary one it just used, so it is never asked for again.
+- **Same rules as the web**: buttons appear only if the person holds the permission for that list type (add items, edit items, cart and purchase, manage lists), taken from the server's answer. Lists hidden from a person simply do not exist on their phone.
+- **Same look as the web**: Tailwind's grays, white cards with soft shadows, Figtree font, blue/green/orange pill buttons, the sun/moon switch, the language menu, light and dark.
+- **Same wording as the web**: the app reads the web app's own translation files (`assets/lang`), so texts are identical. After changing `resources/lang/*.json` at the project root, run `sh tool/sync_lang.sh`.
+- **Offline first**: every edit is applied and stored on the phone at once, and sent with the next sync (soon after an edit, every 30 seconds, when the connection returns, when the app is reopened, or when you pull down / tap the banner). A strip under the top bar says when the phone is offline or changes are waiting.
+- **Conflicts**: per field, last write wins (two phones changing different fields of the same item keep both). What the server refuses (no permission, the list is gone) is undone and explained.
+- **Footer and account menu links** come from the backoffice (Menus), in the app's language, and are kept for offline use. Pages open in the browser.
+- **Export** a list as a markdown checklist to any app, **finish** a list, create/edit lists and choose who a list is hidden from.
 
-- Shopping lists and items, stored on the device (`shared_preferences`)
-- Add / edit / delete lists and items; move items to the cart and mark them purchased
-- Progress statistics per list and overall
-- Portuguese and English
-- Light and dark appearance
+Not in the app yet (done on the web): managing family members, list types and permissions. Phone-to-phone sync is planned.
 
-## What is planned
+## Running it
 
-The goal is for the app to **behave and look like the web app**, not to be a separate product.
+Requirements: Flutter 3.47+, the Android SDK with its licences accepted (`flutter doctor --android-licenses`), a phone with USB debugging (or an emulator).
 
-**Sign-in and sync (API v1)** - [reference](../../docs/api.md)
-- Sign in with the same email and password as the web app; one token per device, revocable from the web
-- First login with a temporary password asks the member to choose their own
-- A local database plus an outbox of offline changes, sent and received with the single `POST /api/v1/sync` call
-- Conflicts resolved per field, last write wins; deletions propagate as tombstones
-
-**Same rules as the web**
-- Buttons appear only if the member holds the permission (add items, edit items, cart & purchase, manage lists), per list type, using the `permissions` the API returns
-- Lists hidden from the member simply do not exist on the phone
-- Admins and members who manage a list type can choose who a list is hidden from
-- List types come from the family
-
-**Same look as the web**
-- Same layout, colours, spacing, icons and wording as the Laravel views, in light and dark
-
-**Nearby sync (Android)**
-- Phones of the same family find each other (Android Nearby Connections) and exchange changes directly, using the same sync protocol and a server-issued family key, so a stranger's phone cannot join. Needs one prior sync with the server to obtain the key.
-
-## Development
-
-Requirements: Flutter 3.47+ (Dart 3.8+).
+The server address defaults to `http://localhost:8000`, which is what you want with the phone on USB:
 
 ```bash
-flutter pub get          # install dependencies
-flutter analyze          # static analysis
-flutter test             # tests
-flutter run              # run on a connected device or emulator
+php artisan db:seed --class=DemoSeeder         # in the project root: a demo family (see the root README)
+php artisan serve --port=8000                  # the web app and the API
+adb reverse tcp:8000 tcp:8000                  # the phone's localhost:8000 is this PC's
+
+cd mobile/shopping_list
+flutter pub get
+flutter run                                    # or: flutter build apk --debug, then adb install -r
 ```
 
-Build:
+Sign in with `joana@demo.test` and the password `Silva` (the family name; the app asks for a new one). Other demo people: `bia@demo.test`, `rui@demo.test` (see the root README for what each may do).
+
+To point a build at another server: `flutter run --dart-define=API_BASE_URL=https://lists.example.com`, or type the address under **Server** on the sign-in screen.
+
+Plain `http` is only allowed for `localhost` and `10.0.2.2` (see `android/app/src/main/res/xml/network_security_config.xml`); any other server must use HTTPS.
 
 ```bash
-flutter build apk --release
+flutter analyze        # static analysis
+flutter test           # the sync, permissions and API client tests
 ```
 
-Android builds need the SDK licences accepted once: `flutter doctor --android-licenses`.
-
-### Known issues
-
-- `test/widget_test.dart` fails: it builds `MyApp` without the `LocaleService` provider that `main.dart` now requires.
-- `lib/services/web_api_service.dart` and `connection_manager.dart` still target the removed API and will be replaced by the v1 client.
-
-### Project structure
+## How it is built
 
 ```
 lib/
-├── main.dart                  App entry point, providers
-├── models/                    Shopping list and item models
-├── services/
-│   ├── shopping_lists_service.dart   Local data and business logic
-│   ├── web_api_service.dart          Legacy API client (to be replaced by the v1 client)
-│   ├── connection_manager.dart       Connectivity monitoring
-│   └── custom_locale_delegate.dart   Language handling
-├── screens/                   List detail screen
-├── widgets/                   Cards, dialogs, item tiles, sync status
-├── l10n/                      pt / en translations (.arb)
-├── pages/ , utils/            App-icon generator (development tool, see ICON_UPDATE_INSTRUCTIONS.md)
+  core/        time and JSON helpers
+  data/        api_client (the /api/v1 client), local_db (SQLite), repository (edits, outbox, merge), models, me (permissions)
+  state/       settings (language, theme, texts), auth (token, first login), sync (when and how), menu_service (footer links)
+  ui/          theme (the web's look), widgets, screens
 ```
 
-### Dependencies
-
-| Package | Used for |
-|---|---|
-| `provider` | State management |
-| `shared_preferences` | Local storage (until the local database lands) |
-| `http` | API calls |
-| `connectivity_plus` | Detecting connectivity (returns a *list* of active connections since v6) |
-| `intl`, `flutter_localizations` | Translations |
-| `flutter_launcher_icons` (dev) | Generating the launcher icon |
-
-### App icon
-
-See [ICON_UPDATE_INSTRUCTIONS.md](ICON_UPDATE_INSTRUCTIONS.md).
+The heart is `Repository`: edits mark the fields changed on the phone (`pending`, with the time of each change); `buildPush` turns them into the request; `applyResponse` merges the answer field by field, drops lists that are no longer visible, undoes refused changes and stores the cursor. It is covered by unit tests with an in-memory store (`test/`).

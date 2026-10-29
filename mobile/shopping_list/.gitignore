@@ -89,3 +89,6 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Gradle build output of the Android project
+/android/build/
