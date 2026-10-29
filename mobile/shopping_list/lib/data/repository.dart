@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -24,6 +25,27 @@ class Rejection {
 class SyncOutcome {
   final List<Rejection> rejections = [];
   bool needsFullPull = false;
+}
+
+/// A list type of a local family.
+class LocalType {
+  LocalType(this.name, this.nameAt);
+
+  String name;
+  int nameAt;
+}
+
+/// A person of a local family, as this phone knows them.
+class LocalMember {
+  LocalMember({required this.id, required this.name, required this.nameAt, required this.joinedAt, this.seenAt});
+
+  final String id;
+  String name;
+  int nameAt;
+  final int joinedAt;
+
+  /// When this phone last talked to theirs (told to nobody: only this phone's own knowledge).
+  int? seenAt;
 }
 
 /// The family's lists and items on this phone.
@@ -68,6 +90,11 @@ class Repository extends ChangeNotifier {
   int _revision = 0;
   int get revision => _revision;
 
+  /// Goes up only with what was done on this phone, not with what a phone nearby brought: it tells
+  /// a connection that is open that this phone has news for the other one.
+  int _editMark = 0;
+  int get editMark => _editMark;
+
   Future<void> load() async {
     _lists
       ..clear()
@@ -76,6 +103,7 @@ class Repository extends ChangeNotifier {
     final rawMe = await _db.getMeta('me');
     _me = rawMe == null ? null : Me.fromJson(jsonDecode(rawMe) as Map<String, dynamic>);
     _local = await _db.getMeta('local_family') != null;
+    if (_local) await _loadLocalState();
 
     _tombstones
       ..clear()
@@ -276,6 +304,7 @@ class Repository extends ChangeNotifier {
     Iterable<String> removeItems = const [],
   }) {
     _revision++;
+    _editMark++;
 
     if (_local) {
       // Nothing waits for a server here: the changes are simply the family's state
@@ -837,40 +866,137 @@ class Repository extends ChangeNotifier {
   // -------------------------------------------------------------- local family
   //
   // A local family has no server. Its phones keep each other up to date by comparing what each
-  // holds (a digest: one number or three per list and item) and sending only what the other lacks
-  // or has older, field by field, the newest change of each field winning. Deletions are
-  // remembered and passed on, and win over later edits. Whoever is in the family may do anything.
+  // holds (a digest: one number or three per list, item, list type and member) and sending only
+  // what the other lacks or has older, field by field, the newest change of each field winning.
+  // Deletions are remembered and passed on, and win over later edits. Whoever is in the family
+  // may do anything: the connect code is what lets a phone in.
 
-  /// Make this phone a member of a local family: the person, and the one list type it has.
-  Future<void> startLocal({required String myName, required String familyName}) async {
+  /// The default list type's name, until someone renames it.
+  static const defaultTypeName = 'Shopping';
+
+  final Map<int, LocalType> _localTypes = {};
+  final Map<String, LocalMember> _localMembers = {};
+  String _localMyId = '';
+  String _familyName = '';
+  int _familyNameAt = 0;
+
+  /// Who this phone is in the local family (an id of its own, told to the others).
+  String get localMyId => _localMyId;
+
+  /// The family's people as far as this phone knows, this phone's person first.
+  List<LocalMember> get localMembers {
+    final members = _localMembers.values.toList()
+      ..sort((a, b) {
+        if (a.id == _localMyId) return -1;
+        if (b.id == _localMyId) return 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+    return members;
+  }
+
+  /// The family's list types, by name.
+  List<MapEntry<int, String>> get localTypes =>
+      _localTypes.entries.map((e) => MapEntry(e.key, e.value.name)).toList()..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+
+  /// How many lists are of a type (a type in use cannot be deleted).
+  int listsOfType(int typeId) => _lists.values.where((list) => list.listTypeId == typeId).length;
+
+  /// Make this phone a member of a local family: the person, and the default list type.
+  /// [creating] is the phone that starts the family; one that joins takes the family's name and
+  /// list types from the phones it meets, whatever they say being newer than its own blanks.
+  Future<void> startLocal({
+    required String myName,
+    required String familyName,
+    required String memberId,
+    String typeName = defaultTypeName,
+    bool creating = true,
+  }) async {
     _lists.clear();
     _tombstones.clear();
     _local = true;
     _revision = 0;
-
     await _db.wipe();
-    await _saveLocalMe(myName, familyName);
+
+    final now = nowMs();
+    _localMyId = memberId;
+    _localTypes
+      ..clear()
+      ..[localTypeId] = LocalType(typeName, creating ? now : 0);
+    _localMembers
+      ..clear()
+      ..[memberId] = LocalMember(id: memberId, name: myName.trim(), nameAt: now, joinedAt: now);
+    _familyName = familyName.trim();
+    _familyNameAt = creating ? now : 0;
+
+    await _saveLocalState();
     notifyListeners();
   }
 
-  /// The family's name, once a phone nearby has told it to a phone that joined by code.
-  Future<void> setFamilyName(String familyName) async {
-    final me = _me;
-    if (!_local || me == null) return;
+  /// Read what was saved (or, for a family started before this existed, make it up from `me`).
+  Future<void> _loadLocalState() async {
+    final raw = await _db.getMeta('local_state');
+    final identity = await _db.getMeta('local_family');
+    final mine = identity == null ? <String, dynamic>{} : asMap(jsonDecode(identity));
 
-    await _saveLocalMe(me.name, familyName);
-    notifyListeners();
+    _localTypes.clear();
+    _localMembers.clear();
+
+    if (raw == null) {
+      _localMyId = mine['member_id'] as String? ?? '';
+      _familyName = _me?.familyName ?? mine['family_name'] as String? ?? '';
+      _familyNameAt = 0;
+      _localTypes[localTypeId] = LocalType(defaultTypeName, 0);
+      if (_localMyId.isNotEmpty) {
+        _localMembers[_localMyId] = LocalMember(id: _localMyId, name: _me?.name ?? mine['my_name'] as String? ?? '', nameAt: nowMs(), joinedAt: nowMs());
+      }
+      return;
+    }
+
+    final state = asMap(jsonDecode(raw));
+    _localMyId = state['my_id'] as String? ?? '';
+    _familyName = asMap(state['family'])['name'] as String? ?? '';
+    _familyNameAt = (asMap(state['family'])['at'] as num?)?.toInt() ?? 0;
+    asMap(state['types']).forEach((id, type) {
+      final map = asMap(type);
+      _localTypes[int.parse(id)] = LocalType(map['name'] as String? ?? '', (map['at'] as num?)?.toInt() ?? 0);
+    });
+    asMap(state['members']).forEach((id, member) {
+      final map = asMap(member);
+      _localMembers[id] = LocalMember(
+        id: id,
+        name: map['name'] as String? ?? '',
+        nameAt: (map['at'] as num?)?.toInt() ?? 0,
+        joinedAt: (map['joined'] as num?)?.toInt() ?? 0,
+        seenAt: (map['seen'] as num?)?.toInt(),
+      );
+    });
   }
 
-  Future<void> _saveLocalMe(String name, String familyName) async {
+  Future<void> _saveLocalState() async {
+    await _db.setMeta(
+      'local_state',
+      jsonEncode({
+        'my_id': _localMyId,
+        'family': {'name': _familyName, 'at': _familyNameAt},
+        'types': {for (final e in _localTypes.entries) '${e.key}': {'name': e.value.name, 'at': e.value.nameAt}},
+        'members': {
+          for (final m in _localMembers.values) m.id: {'name': m.name, 'at': m.nameAt, 'joined': m.joinedAt, 'seen': m.seenAt},
+        },
+      }),
+    );
+    await _rebuildLocalMe();
+  }
+
+  /// `me` is what the rest of the app reads: this person, the family's name and its list types.
+  Future<void> _rebuildLocalMe() async {
     final json = {
-      'user': {'id': 1, 'name': name, 'email': '', 'role': 'member'},
-      'family': {'name': familyName},
+      'user': {'id': 1, 'name': _localMembers[_localMyId]?.name ?? '', 'email': '', 'role': 'member'},
+      'family': {'name': _familyName},
       'list_types': [
-        {'id': localTypeId, 'name': ''},
+        for (final e in _localTypes.entries) {'id': e.key, 'name': e.value.name},
       ],
       'permissions': {
-        '$localTypeId': {for (final key in abilityKeys.values) key: true},
+        for (final id in _localTypes.keys) '$id': {for (final key in abilityKeys.values) key: true},
       },
       'members': const [],
     };
@@ -879,14 +1005,99 @@ class Repository extends ChangeNotifier {
     _me = Me.fromJson(json);
   }
 
+  /// A change to the family itself (its people, types or name): saved, counted, and told to the phones nearby.
+  void _familyChanged() {
+    _revision++;
+    _editMark++;
+    _saveLocalState();
+    notifyListeners();
+    onLocalChange?.call();
+  }
+
+  void renameMe(String name) {
+    final me = _localMembers[_localMyId];
+    if (me == null || name.trim().isEmpty) return;
+
+    me.name = name.trim();
+    me.nameAt = nowMs();
+    _familyChanged();
+  }
+
+  void renameFamily(String name) {
+    if (name.trim().isEmpty) return;
+
+    _familyName = name.trim();
+    _familyNameAt = nowMs();
+    _familyChanged();
+  }
+
+  /// A new list type, with an id of its own that no other phone will pick.
+  int addLocalType(String name) {
+    final random = Random.secure();
+    var id = 1 + random.nextInt(0x7fffffff - 1);
+    while (_localTypes.containsKey(id) || id == localTypeId) {
+      id = 1 + random.nextInt(0x7fffffff - 1);
+    }
+
+    _localTypes[id] = LocalType(name.trim(), nowMs());
+    _familyChanged();
+    return id;
+  }
+
+  void renameLocalType(int id, String name) {
+    final type = _localTypes[id];
+    if (type == null || name.trim().isEmpty) return;
+
+    type.name = name.trim();
+    type.nameAt = nowMs();
+    _familyChanged();
+  }
+
+  /// False when it cannot go: the default type stays, and a type with lists in it too.
+  bool deleteLocalType(int id) {
+    if (id == localTypeId || !_localTypes.containsKey(id) || listsOfType(id) > 0) return false;
+
+    _localTypes.remove(id);
+    _rememberKey('type:$id', 'type');
+    _familyChanged();
+    return true;
+  }
+
+  /// Take someone off the family's list (a phone that left, or a name that is no longer there).
+  void removeLocalMember(String id) {
+    if (id == _localMyId || !_localMembers.containsKey(id)) return;
+
+    _localMembers.remove(id);
+    _rememberKey('member:$id', 'member');
+    _familyChanged();
+  }
+
+  /// This phone just talked to the phone of [memberId].
+  void noteSeen(String memberId) {
+    final member = _localMembers[memberId];
+    if (member == null) return;
+
+    member.seenAt = nowMs();
+    _saveLocalState();
+    notifyListeners();
+  }
+
+  void _rememberKey(String key, String kind, {int? at}) {
+    _tombstones[key] = {'at': at ?? nowMs(), 'kind': kind};
+    _db.setMeta(_tombstoneMetaKey, jsonEncode(_tombstones));
+  }
+
   /// What this phone holds, for the other phone to compare with its own: when each list's name
-  /// and each item's fields were last changed, and what was deleted.
+  /// and each item's fields were last changed, the family's types, people and name, and what was deleted.
   Map<String, dynamic> buildLocalDigest() => {
         'lists': {for (final list in _lists.values) list.uuid: list.nameChangedAt},
         'items': {
           for (final list in _lists.values)
             for (final item in list.items) item.uuid: [item.nameChangedAt, item.quantityChangedAt, item.statusChangedAt],
         },
+        'types': {for (final e in _localTypes.entries) '${e.key}': e.value.nameAt},
+        'members': {for (final m in _localMembers.values) m.id: m.nameAt},
+        'family': _familyNameAt,
         'gone': {for (final entry in _tombstones.entries) entry.key: entry.value['at']},
       };
 
@@ -895,18 +1106,33 @@ class Repository extends ChangeNotifier {
   Map<String, dynamic> buildLocalDelta(Map<String, dynamic> digest) {
     final theirLists = asMap(digest['lists']);
     final theirItems = asMap(digest['items']);
+    final theirTypes = asMap(digest['types']);
+    final theirMembers = asMap(digest['members']);
     final theirGone = asMap(digest['gone']);
 
     final lists = <Map<String, dynamic>>[];
     final items = <Map<String, dynamic>>[];
+    final types = <Map<String, dynamic>>[];
+    final members = <Map<String, dynamic>>[];
     final gone = <Map<String, dynamic>>[];
+
+    bool older(Object? theirs, int mine) => theirs == null || (theirs as num).toInt() < mine;
+
+    for (final e in _localTypes.entries) {
+      if (theirGone.containsKey('type:${e.key}')) continue;
+      if (older(theirTypes['${e.key}'], e.value.nameAt)) types.add({'id': e.key, 'name': e.value.name, 'at': e.value.nameAt});
+    }
+
+    for (final m in _localMembers.values) {
+      if (theirGone.containsKey('member:${m.id}')) continue;
+      if (older(theirMembers[m.id], m.nameAt)) members.add({'id': m.id, 'name': m.name, 'at': m.nameAt, 'joined': m.joinedAt});
+    }
 
     for (final list in _lists.values) {
       if (theirGone.containsKey(list.uuid)) continue; // deleted over there: they will say so
 
-      final theirs = theirLists[list.uuid];
-      if (theirs == null || (theirs as num).toInt() < list.nameChangedAt) {
-        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt});
+      if (older(theirLists[list.uuid], list.nameChangedAt)) {
+        lists.add({'uuid': list.uuid, 'name': list.name, 'name_at': list.nameChangedAt, 'type': list.listTypeId});
       }
 
       for (final item in list.items) {
@@ -933,18 +1159,29 @@ class Repository extends ChangeNotifier {
       }
     }
 
-    _tombstones.forEach((uuid, entry) {
-      final isList = entry['kind'] == 'list';
-      if ((isList ? theirLists : theirItems).containsKey(uuid)) {
-        gone.add({'uuid': uuid, 'kind': entry['kind'], 'at': entry['at'], 'list': entry['list']});
-      }
+    _tombstones.forEach((key, entry) {
+      final kind = entry['kind'];
+      final held = switch (kind) {
+        'list' => theirLists.containsKey(key),
+        'type' => theirTypes.containsKey(key.substring('type:'.length)),
+        'member' => theirMembers.containsKey(key.substring('member:'.length)),
+        _ => theirItems.containsKey(key),
+      };
+      if (held) gone.add({'uuid': key, 'kind': kind, 'at': entry['at'], 'list': entry['list']});
     });
 
-    return {'lists': lists, 'items': items, 'gone': gone};
+    return {
+      'lists': lists,
+      'items': items,
+      'types': types,
+      'members': members,
+      'gone': gone,
+      if (_familyNameAt > ((digest['family'] as num?)?.toInt() ?? 0)) 'family': {'name': _familyName, 'at': _familyNameAt},
+    };
   }
 
-  /// Take in what another phone of the family sent: deletions first (they win), then lists and
-  /// items, each field only when it is newer than what is held.
+  /// Take in what another phone of the family sent: deletions first (they win), then the family
+  /// itself, lists and items, each field only when it is newer than what is held.
   Future<PeerApplied> applyLocalDelta(Map<String, dynamic> delta) async {
     final applied = PeerApplied();
     if (!_local || _me == null) return applied;
@@ -953,6 +1190,7 @@ class Repository extends ChangeNotifier {
     final saveItems = <ItemRecord>{};
     final removeLists = <String>{};
     final removeItems = <String>{};
+    var familyChanged = false;
 
     bool newer(Object? at, int held) => at is num && at.toInt() > held;
 
@@ -961,30 +1199,88 @@ class Repository extends ChangeNotifier {
       if (uuid == null) continue;
       final at = (entry['at'] as num?)?.toInt();
 
-      if (entry['kind'] == 'list') {
-        final list = _lists[uuid];
-        _remember(uuid, list: true, type: list?.listTypeId ?? localTypeId, at: at);
-        if (list == null) continue;
+      switch (entry['kind']) {
+        case 'type':
+          final id = int.tryParse(uuid.substring('type:'.length));
+          // The default type stays, and so does one that has lists here
+          if (id == null || id == localTypeId || listsOfType(id) > 0) continue;
+          _rememberKey(uuid, 'type', at: at);
+          familyChanged = _localTypes.remove(id) != null || familyChanged;
+        case 'member':
+          final id = uuid.substring('member:'.length);
+          if (id == _localMyId) continue; // this phone is still here
+          _rememberKey(uuid, 'member', at: at);
+          familyChanged = _localMembers.remove(id) != null || familyChanged;
+        case 'list':
+          final list = _lists[uuid];
+          _remember(uuid, list: true, type: list?.listTypeId ?? localTypeId, at: at);
+          if (list == null) continue;
 
-        _lists.remove(uuid);
-        removeLists.add(uuid);
-        for (final item in list.items) {
-          removeItems.add(item.uuid);
-        }
-        applied.lists++;
-      } else {
-        final listUuid = entry['list'] as String?;
-        final item = listUuid == null ? null : _item(listUuid, uuid);
+          _lists.remove(uuid);
+          removeLists.add(uuid);
+          for (final item in list.items) {
+            removeItems.add(item.uuid);
+          }
+          applied.lists++;
+        default:
+          final listUuid = entry['list'] as String?;
+          final item = listUuid == null ? null : _item(listUuid, uuid);
 
-        // What is in the cart is about to be bought: it stays, here
-        if (item != null && item.status == ItemStatus.inCart) continue;
+          // What is in the cart is about to be bought: it stays, here
+          if (item != null && item.status == ItemStatus.inCart) continue;
 
-        _remember(uuid, list: false, listUuid: listUuid, at: at);
-        if (item == null) continue;
+          _remember(uuid, list: false, listUuid: listUuid, at: at);
+          if (item == null) continue;
 
-        _lists[listUuid]!.items.remove(item);
-        removeItems.add(uuid);
-        applied.items++;
+          _lists[listUuid]!.items.remove(item);
+          removeItems.add(uuid);
+          applied.items++;
+      }
+    }
+
+    // The family itself: its name, list types and people
+    final family = asMap(delta['family']);
+    if (family['name'] is String && newer(family['at'], _familyNameAt) && (family['name'] as String).trim().isNotEmpty) {
+      _familyName = (family['name'] as String).trim();
+      _familyNameAt = (family['at'] as num).toInt();
+      familyChanged = true;
+    }
+
+    for (final entry in (delta['types'] as List? ?? const []).cast<Map<String, dynamic>>()) {
+      final id = (entry['id'] as num?)?.toInt();
+      final name = (entry['name'] as String?)?.trim();
+      if (id == null || name == null || name.isEmpty || _tombstones.containsKey('type:$id')) continue;
+
+      final existing = _localTypes[id];
+      if (existing == null) {
+        _localTypes[id] = LocalType(name, (entry['at'] as num?)?.toInt() ?? nowMs());
+        familyChanged = true;
+      } else if (newer(entry['at'], existing.nameAt)) {
+        existing.name = name;
+        existing.nameAt = (entry['at'] as num).toInt();
+        familyChanged = true;
+      }
+    }
+
+    for (final entry in (delta['members'] as List? ?? const []).cast<Map<String, dynamic>>()) {
+      final id = entry['id'] as String?;
+      final name = (entry['name'] as String?)?.trim();
+      if (id == null || name == null || name.isEmpty || _tombstones.containsKey('member:$id')) continue;
+
+      final existing = _localMembers[id];
+      if (existing == null) {
+        _localMembers[id] = LocalMember(
+          id: id,
+          name: name,
+          nameAt: (entry['at'] as num?)?.toInt() ?? nowMs(),
+          joinedAt: (entry['joined'] as num?)?.toInt() ?? nowMs(),
+        );
+        familyChanged = true;
+      } else if (newer(entry['at'], existing.nameAt)) {
+        // (what others say of this phone's own person is theirs to say only when newer than what it said itself)
+        existing.name = name;
+        existing.nameAt = (entry['at'] as num).toInt();
+        familyChanged = true;
       }
     }
 
@@ -995,15 +1291,17 @@ class Repository extends ChangeNotifier {
 
       final existing = _lists[uuid];
       if (existing == null) {
+        final type = (entry['type'] as num?)?.toInt();
         final created = ShoppingListRecord(
           uuid: uuid,
           name: name,
           nameChangedAt: (entry['name_at'] as num?)?.toInt() ?? nowMs(),
-          listTypeId: localTypeId,
+          listTypeId: type != null && _localTypes.containsKey(type) ? type : localTypeId,
         );
         _lists[uuid] = created;
         saveLists.add(created);
         applied.lists++;
+        applied.added.add(name);
       } else if (newer(entry['name_at'], existing.nameChangedAt)) {
         existing.name = name;
         existing.nameChangedAt = (entry['name_at'] as num).toInt();
@@ -1033,6 +1331,7 @@ class Repository extends ChangeNotifier {
         list.items.add(created);
         saveItems.add(created);
         applied.items++;
+        applied.added.add(name);
         continue;
       }
 
@@ -1058,22 +1357,14 @@ class Repository extends ChangeNotifier {
       }
     }
 
-    if (applied.total > 0 || removeLists.isNotEmpty || removeItems.isNotEmpty) {
-      _changedByPeer(saveLists: saveLists, saveItems: saveItems, removeLists: removeLists, removeItems: removeItems);
+    if (familyChanged) await _saveLocalState();
+
+    if (applied.total > 0 || familyChanged || removeLists.isNotEmpty || removeItems.isNotEmpty) {
+      _revision++;
+      _db.apply(saveLists: saveLists, saveItems: saveItems, removeLists: removeLists, removeItems: removeItems);
+      notifyListeners();
     }
     return applied;
-  }
-
-  /// What a phone nearby brought is stored like a local edit, without telling the sync about it.
-  void _changedByPeer({
-    required Set<ShoppingListRecord> saveLists,
-    required Set<ItemRecord> saveItems,
-    required Set<String> removeLists,
-    required Set<String> removeItems,
-  }) {
-    _revision++;
-    _db.apply(saveLists: saveLists, saveItems: saveItems, removeLists: removeLists, removeItems: removeItems);
-    notifyListeners();
   }
 
   /// Sign-out: nothing of this family stays on the phone.
@@ -1083,6 +1374,10 @@ class Repository extends ChangeNotifier {
     _me = null;
     _local = false;
     _revision = 0;
+    _localTypes.clear();
+    _localMembers.clear();
+    _localMyId = '';
+    _familyName = '';
     await _db.wipe();
     notifyListeners();
   }

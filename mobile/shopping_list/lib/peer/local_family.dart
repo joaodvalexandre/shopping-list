@@ -102,24 +102,19 @@ class LocalFamilyStore {
     return _current;
   }
 
+  /// A person's id in the family: told to the other phones, so each knows who is who.
+  static String newMemberId() => const Uuid().v4();
+
   /// A new family, with a code of its own to give to the others.
-  Future<LocalFamily> create({required String myName, required String familyName}) =>
-      _save(LocalFamily(code: LocalFamilyCodes.generate(), familyName: familyName.trim(), myName: myName.trim(), memberId: const Uuid().v4()));
+  Future<LocalFamily> create({required String myName, required String familyName, String? memberId}) =>
+      _save(LocalFamily(code: LocalFamilyCodes.generate(), familyName: familyName.trim(), myName: myName.trim(), memberId: memberId ?? newMemberId()));
 
   /// An existing family, by its code. Throws [FormatException] when [code] cannot be one.
-  Future<LocalFamily> join({required String myName, required String code}) {
+  Future<LocalFamily> join({required String myName, required String code, String? memberId}) {
     final normalised = LocalFamilyCodes.normalise(code);
     if (normalised == null) throw const FormatException('not a connect code');
 
-    return _save(LocalFamily(code: normalised, familyName: '', myName: myName.trim(), memberId: const Uuid().v4()));
-  }
-
-  /// A phone that joined learns the family's name from the first phone it meets.
-  Future<LocalFamily?> adoptFamilyName(String name) async {
-    final family = await current();
-    if (family == null || family.familyName.isNotEmpty || name.trim().isEmpty) return family;
-
-    return _save(family.copyWith(familyName: name.trim()));
+    return _save(LocalFamily(code: normalised, familyName: '', myName: myName.trim(), memberId: memberId ?? newMemberId()));
   }
 
   Future<void> clear() async {
@@ -133,5 +128,30 @@ class LocalFamilyStore {
     _current = family;
     _loaded = true;
     return family;
+  }
+}
+
+/// What a family's QR code says: its code, and its name (so the phone that scans it can say whose
+/// family it is joining). A plain code, typed or scanned, is understood too.
+class LocalFamilyInvite {
+  const LocalFamilyInvite({required this.code, this.familyName = ''});
+
+  final String code;
+  final String familyName;
+
+  static String encode(String code, String familyName) =>
+      Uri(scheme: 'cestou', host: 'join', queryParameters: {'code': code, if (familyName.isNotEmpty) 'family': familyName}).toString();
+
+  static LocalFamilyInvite? parse(String text) {
+    final trimmed = text.trim();
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.scheme == 'cestou' && uri.host == 'join') {
+      final code = LocalFamilyCodes.normalise(uri.queryParameters['code'] ?? '');
+      return code == null ? null : LocalFamilyInvite(code: code, familyName: uri.queryParameters['family'] ?? '');
+    }
+
+    final code = LocalFamilyCodes.normalise(trimmed);
+    return code == null ? null : LocalFamilyInvite(code: code);
   }
 }

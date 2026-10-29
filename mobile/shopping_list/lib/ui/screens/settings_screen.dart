@@ -94,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // The family's code (local families only)
           if (local) ...[
-            _localFamilyPanel(context, muted),
+            _localFamilyPanel(context, repository, muted),
             const SizedBox(height: 12),
           ],
 
@@ -223,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// The family's code, for the others to join with, and what makes the family local.
-  Widget _localFamilyPanel(BuildContext context, Color muted) {
+  Widget _localFamilyPanel(BuildContext context, Repository repository, Color muted) {
     final code = context.read<AuthState>().localFamily?.currentSync;
 
     return Panel(
@@ -242,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
-              child: PillButton(label: context.t('app_offline_show_code'), icon: Icons.qr_code_2, onPressed: () => showFamilyCode(context, code.code)),
+              child: PillButton(label: context.t('app_offline_show_code'), icon: Icons.qr_code_2, onPressed: () => showFamilyCode(context, code.code, repository.me?.familyName ?? '')),
             ),
           ],
         ],

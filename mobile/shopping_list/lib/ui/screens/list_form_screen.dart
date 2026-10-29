@@ -89,7 +89,7 @@ class _ListFormScreenState extends State<ListFormScreen> {
                     return text.isEmpty || text.length > 255 ? context.rt('app_required') : null;
                   },
                 ),
-                if (!repository.isLocal) ...[
+                if (!repository.isLocal || types.length > 1) ...[
                   const SizedBox(height: 16),
                   Text(context.t('list_type'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: dark ? Tw.gray300 : Tw.gray700)),
                   const SizedBox(height: 4),

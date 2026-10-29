@@ -117,9 +117,10 @@ class AuthState extends ChangeNotifier {
 
   /// Start a family that lives only on phones: no account, no server. The code it is given
   /// is what the family's other phones use to join it.
-  Future<LocalFamily> startLocalFamily({required String myName, required String familyName}) async {
-    await repository.startLocal(myName: myName.trim(), familyName: familyName.trim());
-    final family = await localFamily!.create(myName: myName, familyName: familyName);
+  Future<LocalFamily> startLocalFamily({required String myName, required String familyName, String? typeName}) async {
+    final memberId = LocalFamilyStore.newMemberId();
+    await repository.startLocal(myName: myName.trim(), familyName: familyName.trim(), memberId: memberId, typeName: typeName ?? Repository.defaultTypeName);
+    final family = await localFamily!.create(myName: myName, familyName: familyName, memberId: memberId);
 
     _isLocal = true;
     _set(AuthStatus.signedIn);
@@ -127,12 +128,19 @@ class AuthState extends ChangeNotifier {
   }
 
   /// Join a local family by its code. Throws [FormatException] when [code] cannot be one.
-  Future<LocalFamily> joinLocalFamily({required String myName, required String code}) async {
+  Future<LocalFamily> joinLocalFamily({required String myName, required String code, String? typeName}) async {
     final normalised = LocalFamilyCodes.normalise(code);
     if (normalised == null) throw const FormatException('not a connect code');
 
-    await repository.startLocal(myName: myName.trim(), familyName: '');
-    final family = await localFamily!.join(myName: myName, code: normalised);
+    final memberId = LocalFamilyStore.newMemberId();
+    await repository.startLocal(
+      myName: myName.trim(),
+      familyName: '',
+      memberId: memberId,
+      typeName: typeName ?? Repository.defaultTypeName,
+      creating: false,
+    );
+    final family = await localFamily!.join(myName: myName, code: normalised, memberId: memberId);
 
     _isLocal = true;
     _set(AuthStatus.signedIn);

@@ -412,7 +412,7 @@ void main() {
 
   group('a local family', () {
     /// A phone of a local family with its radio and service: no server, no credential.
-    Future<({Repository repo, NearbyService service, FakeRadio radio, Trigger trigger})> localPhone(
+    Future<({Repository repo, NearbyService service, FakeRadio radio, Trigger trigger, MemoryStore store})> localPhone(
       String device,
       String name, {
       String? code,
@@ -422,11 +422,12 @@ void main() {
       final repo = Repository(store);
       final family = LocalFamilyStore(store);
 
-      await repo.startLocal(myName: name, familyName: familyName);
+      final memberId = LocalFamilyStore.newMemberId();
+      await repo.startLocal(myName: name, familyName: familyName, memberId: memberId, creating: code == null);
       if (code == null) {
-        await family.create(myName: name, familyName: familyName);
+        await family.create(myName: name, familyName: familyName, memberId: memberId);
       } else {
-        await family.join(myName: name, code: code);
+        await family.join(myName: name, code: code, memberId: memberId);
       }
 
       final radio = FakeRadio(air, 'ep-$device');
@@ -438,7 +439,7 @@ void main() {
         prefs: prefs,
         appVersion: '1.1.0+7',
         deviceId: device,
-        trigger: trigger,
+        trigger: Listenable.merge([trigger, repo]),
         offline: () => true,
         signedIn: () => true,
         personName: () => name,
@@ -449,7 +450,7 @@ void main() {
         retryAfter: const Duration(milliseconds: 50),
       );
 
-      return (repo: repo, service: service, radio: radio, trigger: trigger);
+      return (repo: repo, service: service, radio: radio, trigger: trigger, store: store);
     }
 
     test('phones with the same code find each other, sync, and stay connected for the next change', () async {
@@ -474,6 +475,84 @@ void main() {
       await until(() => ana.repo.itemsOf(shop.uuid).any((i) => i.name == 'Eggs'));
 
       expect(ana.radio.calledTo.length + bia.radio.calledTo.length, connections);
+    });
+
+    test('everything done here during a round, and right after it, gets through without waiting', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final code = (await ana.service.localFamily!.current())!.code;
+      final bia = await localPhone('bbbb', 'Bia', code: code);
+
+      ana.service.setForeground(true);
+      bia.service.setForeground(true);
+      await until(() => ana.service.state == NearbyState.connected && bia.service.state == NearbyState.connected);
+
+      // no trigger fired by hand: the repository's own change is what tells the service
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      for (var i = 0; i < 6; i++) {
+        ana.repo.addItem(shop.uuid, name: 'Item $i', quantity: 1);
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+      }
+
+      await until(() => bia.repo.list(shop.uuid) != null && bia.repo.itemsOf(shop.uuid).length == 6);
+    });
+
+    test('news that comes in is reported, for a notification when nobody is looking', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      final code = (await ana.service.localFamily!.current())!.code;
+      final bia = await localPhone('bbbb', 'Bia', code: code);
+
+      final news = <String>[];
+      bia.service.dispose();
+      final listening = NearbyService(
+        radio: bia.radio,
+        identity: PeerIdentity(secrets: MemorySecrets(), store: MemoryStore()),
+        repository: bia.repo,
+        prefs: prefs,
+        appVersion: '1.1.0+7',
+        deviceId: 'bbbb',
+        trigger: Trigger(),
+        offline: () => true,
+        signedIn: () => true,
+        personName: () => 'Bia',
+        hasPermissions: () async => true,
+        localFamily: LocalFamilyStore(bia.store),
+        onNews: (result) => news.addAll(result.applied.added.map((name) => '${result.peerName}: $name')),
+        retryAfter: const Duration(milliseconds: 50),
+      );
+
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 1);
+
+      ana.service.setForeground(true);
+      listening.setForeground(true);
+
+      await until(() => news.contains('Ana: Milk'));
+      listening.dispose();
+    });
+
+    test('a local family keeps looking with the app off screen, when asked to', () async {
+      final ana = await localPhone('aaaa', 'Ana', familyName: 'Silva');
+      ana.service.dispose();
+
+      final keeping = NearbyService(
+        radio: ana.radio,
+        identity: PeerIdentity(secrets: MemorySecrets(), store: MemoryStore()),
+        repository: ana.repo,
+        prefs: prefs,
+        appVersion: '1.1.0+7',
+        deviceId: 'aaaa',
+        trigger: Trigger(),
+        offline: () => true,
+        signedIn: () => true,
+        personName: () => 'Ana',
+        hasPermissions: () async => true,
+        localFamily: LocalFamilyStore(ana.store),
+        keepInBackground: () => true,
+      );
+
+      keeping.setForeground(false);
+      await until(() => ana.radio.started);
+      keeping.dispose();
     });
 
     test('a phone with another code is not even connected to', () async {

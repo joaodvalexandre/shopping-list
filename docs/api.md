@@ -335,3 +335,10 @@ The app can be used with no account and no server: on the login page, "Use the a
 - A meeting is the same hello / proof / ready / offer / done as for server families, over Nearby Connections, and the connection stays open between rounds. There is no server to settle clashes: the phones **compare what each holds** (the time each list name and item field was last changed, and what was deleted) and send only what the other lacks or has older. Per field the newest change wins; a deletion wins over later edits and is remembered 90 days; an item in the cart is not deleted.
 - Everyone in a local family may do everything (one list type, no rights, no hidden lists). The family's name is learned from the first phone a joining phone meets.
 - Phones only exchange with the very same app version, as always. Leaving a local family removes its lists from that phone only.
+
+### The offline family's page, QR code and background
+
+- **Family page** (the Family tab of an offline family): that this phone is in the family and as whom, how the link with the others is (connected, looking), the people the family has (each phone says who it is when it meets another; those heard of through a third phone show "not met yet"), the family's list types (any of them may be renamed, added, deleted when empty), the code with its QR code, and "leave". The family's name, its list types and its people are kept in step between the phones like the lists.
+- **QR code**: `cestou://join?code=ABCDEFGHJKLM&family=Silva`. "Use the app offline" > "I have a code" > "Scan a QR code" fills the code in; a plain code is understood too.
+- **Staying connected**: a connection is kept open between rounds, and later rounds start at "ready" (no hello or proof again), so a change reaches the other phone in about a second. With the app off screen or the phone locked, an offline family keeps its connection with an Android foreground service (a notification that stays: "Cestou · offline family", saying who it is connected to), and shows a notification when changes come in. Swiping the app away from the recent apps ends it.
+

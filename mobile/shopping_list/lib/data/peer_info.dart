@@ -59,5 +59,8 @@ class PeerApplied {
   int lists = 0;
   int items = 0;
 
+  /// Names of the items and lists that are new here (a few, for a notification to say).
+  final List<String> added = [];
+
   int get total => lists + items;
 }

@@ -22,10 +22,13 @@ enum PeerStatus { done, versionMismatch, differentFamily, differentServer, inval
 
 /// How a meeting with a phone nearby went.
 class PeerResult {
-  PeerResult(this.status, {this.peerName, this.theirVersion, this.sent = 0, PeerApplied? applied}) : applied = applied ?? _none;
+  PeerResult(this.status, {this.peerName, this.peerId, this.theirVersion, this.sent = 0, PeerApplied? applied}) : applied = applied ?? _none;
 
   final PeerStatus status;
   final String? peerName;
+
+  /// Which person of a local family it was (their id in the family), when it was one.
+  final String? peerId;
 
   /// The other phone's app version, when it is not ours.
   final String? theirVersion;
@@ -259,8 +262,7 @@ class LocalPeerSession {
     required this.appVersion,
     required this.channel,
     this.displayName = '',
-    this.familyName = '',
-    this.onFamilyName,
+    this.knownPeer,
     this.timeout = const Duration(seconds: 20),
   });
 
@@ -269,10 +271,10 @@ class LocalPeerSession {
   final String appVersion;
   final PeerChannel channel;
   final String displayName;
-  final String familyName;
 
-  /// Told the family's name when the other phone has one and this one does not yet.
-  final Future<void> Function(String name)? onFamilyName;
+  /// Set on a connection that was already proven to belong to the family: the next rounds
+  /// skip hello and proof (the connection is encrypted and has not changed hands) and start at "ready".
+  final ({String name, String? id})? knownPeer;
   final Duration timeout;
 
   static const protocol = 1;
@@ -282,7 +284,8 @@ class LocalPeerSession {
     final subscription = channel.messages.listen(inbox.add, onDone: inbox.close, onError: (_) => inbox.close());
 
     try {
-      return await _meet(inbox);
+      final known = knownPeer;
+      return known != null ? await _exchange(inbox, known.name, known.id) : await _meet(inbox);
     } on _Bye catch (bye) {
       return PeerResult(PeerSession._statusOf(bye.reason), theirVersion: bye.detail);
     } on TimeoutException {
@@ -307,7 +310,7 @@ class LocalPeerSession {
       'mode': 'local',
       'version': appVersion,
       'name': displayName,
-      'family': familyName,
+      'member': repository.localMyId,
       'nonce': myNonce,
     });
 
@@ -334,6 +337,11 @@ class LocalPeerSession {
       return PeerResult(PeerStatus.invalidCredential);
     }
 
+    return _exchange(inbox, hello['name']?.toString() ?? '', hello['member']?.toString());
+  }
+
+  /// ready, offer, done: compare what each holds, and swap what the other lacks.
+  Future<PeerResult> _exchange(_Inbox inbox, String peerName, String? peerId) async {
     // 3. ready: what each holds, in a few numbers
     await channel.send({'t': 'ready', 'digest': repository.buildLocalDigest()});
     final ready = await inbox.receive('ready', timeout);
@@ -346,8 +354,7 @@ class LocalPeerSession {
     final theirOffer = await inbox.receive('offer', timeout);
     final applied = await repository.applyLocalDelta(theirOffer);
 
-    final theirFamily = hello['family']?.toString() ?? '';
-    if (familyName.isEmpty && theirFamily.isNotEmpty) await onFamilyName?.call(theirFamily);
+    if (peerId != null) repository.noteSeen(peerId);
 
     // 5. done (the other may already have gone: that is fine)
     await channel.send({'t': 'done'});
@@ -355,7 +362,7 @@ class LocalPeerSession {
       await inbox.receive('done', const Duration(seconds: 3));
     } catch (_) {}
 
-    return PeerResult(PeerStatus.done, peerName: hello['name']?.toString(), sent: sent, applied: applied);
+    return PeerResult(PeerStatus.done, peerName: peerName, peerId: peerId, sent: sent, applied: applied);
   }
 
   Future<void> _bye(String reason, [String? detail]) async {

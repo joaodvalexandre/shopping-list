@@ -6,7 +6,9 @@ import '../../peer/local_family.dart';
 import '../../state/auth_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'local_family_screen.dart';
 import 'login_screen.dart';
+import 'qr_scan_screen.dart';
 
 /// Use the app with no account and no server: start a family that lives on its phones, or join
 /// one with its code. Nothing is ever created on the web app or sent to it.
@@ -34,6 +36,13 @@ class _OfflineStartScreenState extends State<OfflineStartScreen> {
     super.dispose();
   }
 
+  Future<void> _scan() async {
+    final code = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const QrScanScreen()));
+    if (code == null || !mounted) return;
+
+    setState(() => _code.text = LocalFamilyCodes.format(code));
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
 
@@ -43,11 +52,11 @@ class _OfflineStartScreenState extends State<OfflineStartScreen> {
 
     try {
       if (_joining) {
-        await auth.joinLocalFamily(myName: _name.text, code: _code.text);
+        await auth.joinLocalFamily(myName: _name.text, code: _code.text, typeName: context.rt('app_offline_default_type'));
       } else {
-        final family = await auth.startLocalFamily(myName: _name.text, familyName: _familyName.text);
+        final family = await auth.startLocalFamily(myName: _name.text, familyName: _familyName.text, typeName: context.rt('app_offline_default_type'));
         if (!mounted) return;
-        await showFamilyCode(context, family.code);
+        await showFamilyCode(context, family.code, _familyName.text.trim());
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -98,6 +107,12 @@ class _OfflineStartScreenState extends State<OfflineStartScreen> {
                 onSubmitted: (_) => _submit(),
                 validator: (value) => LocalFamilyCodes.normalise(value ?? '') == null ? context.rt('app_offline_code_invalid') : null,
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _scan,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: Text(context.t('app_offline_scan')),
+              ),
               const SizedBox(height: 4),
               Text(context.t('app_offline_code_help'), style: TextStyle(fontSize: 12, color: muted)),
             ] else
@@ -130,7 +145,7 @@ class _OfflineStartScreenState extends State<OfflineStartScreen> {
 }
 
 /// The family's code, to be told to the others (and kept private: whoever has it can join).
-Future<void> showFamilyCode(BuildContext context, String code) {
+Future<void> showFamilyCode(BuildContext context, String code, [String familyName = '']) {
   final shown = LocalFamilyCodes.format(code);
 
   return showDialog<void>(
@@ -142,6 +157,8 @@ Future<void> showFamilyCode(BuildContext context, String code) {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(child: FamilyQr(code: code, familyName: familyName, size: 170)),
+          const SizedBox(height: 12),
           Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,

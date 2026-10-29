@@ -17,6 +17,7 @@ import 'state/auth_state.dart';
 import 'state/notification_service.dart';
 import 'state/background_notifications.dart';
 import 'state/content_service.dart';
+import 'state/family_link.dart';
 import 'state/settings_state.dart';
 import 'state/sync_service.dart';
 import 'ui/screens/first_login_screen.dart';
@@ -74,13 +75,33 @@ Future<void> main() async {
     // Only identical builds exchange data
     appVersion: '${info.version}+${info.buildNumber}',
     deviceId: _deviceId(prefs),
-    trigger: Listenable.merge([sync, auth]),
+    trigger: Listenable.merge([sync, auth, repository]),
     // A local family has no server to reach: it always looks for its phones
     offline: () => auth.isLocal || sync.serverUnreachable,
     signedIn: () => auth.status == AuthStatus.signedIn,
     personName: () => repository.me?.name ?? '',
     localFamily: localFamily,
+    // A local family keeps its phones connected with the app off screen (with a notification showing)
+    keepInBackground: () => auth.isLocal,
+    onNews: (result) {
+      // Nobody is looking at the app: say what came in (with it on screen the person sees it arrive)
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (lifecycle == null || lifecycle == AppLifecycleState.resumed) return;
+      if (prefs.getBool(NotificationService.enabledKey) == false) return;
+
+      final what = result.applied.added.isNotEmpty
+          ? result.applied.added.take(4).join(', ')
+          : settings.t('app_link_news_changes', {'count': result.applied.total});
+
+      sink.show(
+        id: 7100,
+        title: settings.t('app_link_news_title', {'name': result.peerName ?? ''}),
+        body: what,
+        payload: '',
+      );
+    },
   );
+  final link = FamilyLink(auth: auth, nearby: nearby, settings: settings);
 
   await auth.init();
 
@@ -96,6 +117,7 @@ Future<void> main() async {
         Provider<NotificationService>.value(value: notifications),
         ChangeNotifierProvider<NearbyService>.value(value: nearby),
         Provider<LocalNoticeSink>.value(value: sink),
+        Provider<FamilyLink>.value(value: link),
       ],
       child: const ShoppingListApp(),
     ),
@@ -205,10 +227,11 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     final repository = context.read<Repository>();
     final auth = context.read<AuthState>();
 
-    // News from the server: nothing to ask for a family that has none
+    await notifications.askPermissionOnce();
+
+    // News from the server: nothing to schedule for a family that has none
     if (auth.isLocal) return;
 
-    await notifications.askPermissionOnce();
     await scheduleBackgroundChecks();
 
     final launched = await sink.launchedWith();

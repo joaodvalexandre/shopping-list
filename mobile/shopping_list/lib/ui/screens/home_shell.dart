@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/repository.dart';
+import '../../state/auth_state.dart';
 import '../../state/sync_service.dart';
 import '../widgets/common.dart';
 import '../widgets/top_bar.dart';
 import 'dashboard_screen.dart';
 import 'family_screen.dart';
 import 'lists_screen.dart';
+import 'local_family_screen.dart';
 
 /// The signed-in app: the web's navbar as a top bar, its main pages as tabs (and Family, for a family admin).
 class HomeShell extends StatefulWidget {
@@ -53,7 +55,9 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final admin = context.watch<Repository>().me?.isAdmin ?? false;
+    final local = context.watch<AuthState>().isLocal;
+    // A server family's admin manages it on the Family tab; an offline family has one for everyone
+    final admin = local || (context.watch<Repository>().me?.isAdmin ?? false);
     final titles = [context.t('dashboard'), context.t('shopping_list'), if (admin) context.t('family')];
     // A family admin who is demoted while on the Family tab lands on the last one left
     final index = _index.clamp(0, titles.length - 1);
@@ -67,7 +71,7 @@ class _HomeShellState extends State<HomeShell> {
           Expanded(
             child: IndexedStack(
               index: index,
-              children: [const DashboardScreen(), const ListsScreen(), if (admin) const FamilyScreen()],
+              children: [const DashboardScreen(), const ListsScreen(), if (admin) (local ? const LocalFamilyScreen() : const FamilyScreen())],
             ),
           ),
         ],

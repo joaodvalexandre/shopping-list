@@ -24,14 +24,52 @@ class ContentService extends ChangeNotifier {
 
   /// Open the local copy, putting the shipped one in place on a fresh install.
   static Future<ContentService> load(LocalStore store, {Future<String> Function()? bundled}) async {
+    final shipped = bundled ?? () => rootBundle.loadString(bundledAsset);
     var snapshot = await store.loadContent();
 
     if (snapshot == null) {
-      snapshot = ContentSnapshot.parse(await (bundled ?? () => rootBundle.loadString(bundledAsset))());
-      await store.saveContent(snapshot);
+      final fresh = ContentSnapshot.parse(await shipped());
+      await store.saveContent(fresh);
+      await store.setMeta(_seededKey, fresh.version);
+      snapshot = fresh;
+    } else {
+      snapshot = await _withNewShippedTexts(store, snapshot, shipped);
     }
 
     return ContentService(store, snapshot);
+  }
+
+  /// Which shipped copy the local one was last topped up with.
+  static const _seededKey = 'content_seeded_version';
+
+  /// An app that was updated brings texts for its new screens. A phone that talks to the server gets
+  /// them with the next refresh, but one that never does (an offline family) would show their keys:
+  /// so the texts the shipped copy has and the local one lacks are added, once per shipped copy.
+  /// What the local copy already has (maybe edited in the backoffice) is left alone.
+  static Future<ContentSnapshot> _withNewShippedTexts(LocalStore store, ContentSnapshot local, Future<String> Function() shipped) async {
+    final fresh = ContentSnapshot.parse(await shipped());
+    if (await store.getMeta(_seededKey) == fresh.version) return local;
+
+    var added = false;
+    final texts = {
+      for (final entry in local.texts.entries) entry.key: Map<String, String>.of(entry.value),
+    };
+    fresh.texts.forEach((language, byKey) {
+      final mine = texts.putIfAbsent(language, () => {});
+      byKey.forEach((key, text) {
+        if (!mine.containsKey(key)) {
+          mine[key] = text;
+          added = true;
+        }
+      });
+    });
+
+    await store.setMeta(_seededKey, fresh.version);
+    if (!added) return local;
+
+    final merged = ContentSnapshot(version: local.version, languages: local.languages, texts: texts, pages: local.pages, menu: local.menu);
+    await store.saveContent(merged);
+    return merged;
   }
 
   /// The language that supplies any text a language lacks.

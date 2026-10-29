@@ -58,9 +58,29 @@ void main() {
   test('later starts use the local copy, not the shipped one', () async {
     store.content = ContentSnapshot.fromJson(payload(version: 'newer'));
 
-    final again = await ContentService.load(store, bundled: () async => fail('must not be read'));
+    final again = await ContentService.load(store, bundled: () async => jsonEncode(payload(version: 'shipped')));
 
     expect(again.version, 'newer');
+    expect(again.titleOf(again.page('privacy')!, 'en'), 'Privacy');
+  });
+
+  test('an updated app adds the texts its new screens need, and leaves the edited ones alone', () async {
+    // the phone holds an edited text and lacks one that the new app ships
+    store.content = ContentSnapshot.fromJson(payload(version: 'server')..['texts'] = {'en': {'login': 'Sign in (edited)'}});
+    store.meta.remove('content_seeded_version');
+
+    final shipped = payload(version: 'shipped');
+    (shipped['texts'] as Map<String, dynamic>)['en'] = {'login': 'Log in', 'app_new_screen': 'A new screen'};
+
+    final updated = await ContentService.load(store, bundled: () async => jsonEncode(shipped));
+
+    expect(updated.version, 'server');                                  // still the server's copy
+    expect(updated.text('en', 'login'), 'Sign in (edited)');            // not overwritten
+    expect(updated.text('en', 'app_new_screen'), 'A new screen');       // added
+
+    // and it is kept, and not done again for the same shipped copy
+    final again = await ContentService.load(store, bundled: () async => jsonEncode(shipped));
+    expect(again.text('en', 'app_new_screen'), 'A new screen');
   });
 
   test('menus show each person the links meant for them, headings with their links', () {

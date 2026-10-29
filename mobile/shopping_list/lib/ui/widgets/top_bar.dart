@@ -158,6 +158,23 @@ class SyncBanner extends StatelessWidget {
     final waiting = context.watch<Repository>().pendingCount;
     final nearby = context.watch<NearbyService>();
 
+    // An offline family has no server to be offline from: its strip is always how the link with its phones is
+    if (context.watch<AuthState>().isLocal) {
+      final (text, icon, color) = localLinkLine(context, nearby);
+
+      return Material(
+        color: color.withValues(alpha: 0.12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+      );
+    }
+
     // With no way to the server the phone may be talking to a phone nearby: say so
     final (String? nearbyText, IconData nearbyIcon, Color nearbyColor) = _nearbyLine(context, nearby);
 
@@ -192,6 +209,28 @@ class SyncBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// How the link of an offline family with its phones is, always said: connected (green), looking
+/// or connecting (blue), or not looking at all (amber).
+(String, IconData, Color) localLinkLine(BuildContext context, NearbyService nearby) {
+  if (nearby.otherVersionSeen != null) {
+    return (context.t('app_nearby_other_version', {'version': nearby.otherVersionSeen!}), Icons.system_update_outlined, Tw.amber600);
+  }
+
+  final who = nearby.currentPeer ?? '';
+
+  return switch (nearby.state) {
+    NearbyState.connected => (context.t('app_local_connected', {'name': who}), Icons.bluetooth_connected, Tw.green600),
+    NearbyState.syncing => (context.t('app_nearby_syncing', {'name': who}), Icons.sync, Tw.blue500),
+    NearbyState.connecting => (context.t('app_nearby_connecting', {'name': who}), Icons.bluetooth_searching, Tw.blue500),
+    NearbyState.searching => (context.t('app_local_searching'), Icons.bluetooth_searching, Tw.blue500),
+    NearbyState.off => (
+        nearby.permissionDenied ? context.t('app_nearby_permission') : context.t(nearby.enabled ? 'app_local_starting' : 'app_local_off'),
+        Icons.bluetooth_disabled,
+        Tw.amber600,
+      ),
+  };
 }
 
 /// What to say about phones nearby (null: nothing). Another version is said first: it needs doing something.

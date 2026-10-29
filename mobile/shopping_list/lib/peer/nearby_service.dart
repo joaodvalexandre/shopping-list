@@ -62,6 +62,8 @@ class NearbyService extends ChangeNotifier {
     this.retryAfter = const Duration(seconds: 5),
     this.linkTimeout = const Duration(seconds: 45),
     this.localFamily,
+    this.keepInBackground,
+    this.onNews,
   }) : _trigger = trigger {
     _trigger.addListener(_evaluate);
   }
@@ -92,6 +94,14 @@ class NearbyService extends ChangeNotifier {
   /// credential from the server, is what makes phones one family.
   final LocalFamilyStore? localFamily;
 
+  /// True when the phone should keep looking for (and talking to) its phones with the app off
+  /// screen, which a local family does with a notification showing (an Android foreground service).
+  final bool Function()? keepInBackground;
+
+  /// Called after a meeting that brought changes, with what came in and who from: for a notification
+  /// when nobody is looking at the app.
+  final void Function(PeerResult result)? onNews;
+
   /// A connection that has neither finished nor failed by then is dropped, so it cannot block the next one.
   final Duration linkTimeout;
 
@@ -113,7 +123,6 @@ class NearbyService extends ChangeNotifier {
   final _retryNotBefore = <String, DateTime>{};
   Timer? _watchdog;
   String? _familyTag;
-  LocalFamily? _local;
   LocalFamilyKey? _localKey;
 
   _Link? _link;
@@ -137,6 +146,12 @@ class NearbyService extends ChangeNotifier {
 
   /// Who this phone is talking to now.
   String? get currentPeer => _currentPeer;
+
+  /// Of a local family: the person (their id in the family) this phone is connected to right now.
+  String? get connectedMemberId {
+    final link = _link;
+    return link != null && link.established && !link.finished ? link.memberId : null;
+  }
 
   /// The device name phones show each other: version, device, family tag and person.
   String get endpointName => '$appVersion|$deviceId|${_familyTag ?? ''}|${personName()}';
@@ -162,7 +177,7 @@ class NearbyService extends ChangeNotifier {
   // ----------------------------------------------------------- when to run
 
   void _evaluate() {
-    final want = enabled && _foreground && signedIn() && offline();
+    final want = _wanted;
 
     if (want && !_running && !_starting) {
       _start();
@@ -173,6 +188,8 @@ class NearbyService extends ChangeNotifier {
     }
   }
 
+  bool get _wanted => enabled && (_foreground || (keepInBackground?.call() ?? false)) && signedIn() && offline();
+
   /// Goes up whenever something changes here that a phone nearby does not have yet.
   int get _changeMark => repository.isLocal ? repository.revision : repository.pendingCount;
 
@@ -181,7 +198,7 @@ class NearbyService extends ChangeNotifier {
     final link = _link;
     if (link != null) {
       // Already connected to a phone: a new round over the same connection
-      if (_isIdle(link) && _changeMark != _pendingAtMeeting[link.peer.device]) _runRound(link);
+      if (_isIdle(link) && _linkDirty(link)) _runRound(link);
       return;
     }
 
@@ -208,11 +225,9 @@ class NearbyService extends ChangeNotifier {
       final local = await localFamily?.current();
       if (local != null) {
         // A local family: whoever knows the code belongs
-        _local = local;
         _localKey = await LocalFamilyKey.derive(local.code);
         _familyTag = await _localKey!.tag();
       } else {
-        _local = null;
         _localKey = null;
 
         // Without a credential from the server nobody can be trusted: it is fetched whenever the server is reachable
@@ -230,7 +245,7 @@ class NearbyService extends ChangeNotifier {
     } finally {
       _starting = false;
       // things may have changed while the radio was starting
-      if (_running && !(enabled && _foreground && signedIn() && offline())) _stop();
+      if (_running && !_wanted) _stop();
     }
   }
 
@@ -425,22 +440,32 @@ class NearbyService extends ChangeNotifier {
     if (message == null) return;
 
     if (!link.sessionActive) {
-      // Between rounds only a new "hello" means something: the other phone has news
-      if (message['t'] != 'hello') return;
-      _runRound(link);
+      // Between rounds only a new "hello" (or, once trusted, "ready") means something: the other phone has news
+      final starts = message['t'] == 'hello' || (message['t'] == 'ready' && link.rounds > 0);
+      if (!starts) return;
+      _runRound(link, fast: message['t'] == 'ready');
     }
     link.channel.deliver(message);
   }
+
+  /// This phone has news for the one it is connected to: edits since the last round started
+  /// (for a local family), or changes waiting to be sent (as before).
+  bool _linkDirty(_Link link) =>
+      repository.isLocal ? repository.editMark != link.editMarkAtStart : _changeMark != _pendingAtMeeting[link.peer.device];
 
   bool _isIdle(_Link link) => link.established && !link.sessionActive && !link.finished;
 
   /// One meeting over the connection: hello, proof, ready, offer, done. The connection is kept
   /// afterwards, so the next round (when something changes, on either phone) needs no new connection.
-  Future<void> _runRound(_Link link) async {
+  Future<void> _runRound(_Link link, {bool? fast}) async {
     if (link.sessionActive || link.finished || !_running) return;
 
     link.sessionActive = true;
+    link.editMarkAtStart = repository.editMark;
     _set(NearbyState.syncing);
+
+    // Once this phone has been proven to belong, the next rounds skip hello and proof
+    final trusted = (fast ?? link.rounds > 0) && link.peerName != null && _localKey != null;
 
     // Sending needs the radio: the channel hands whole messages to it
     final channel = link.channel = _RadioChannel(nextId: () => link.messageIds++)
@@ -454,8 +479,7 @@ class NearbyService extends ChangeNotifier {
             appVersion: appVersion,
             channel: channel,
             displayName: personName(),
-            familyName: _local?.familyName ?? '',
-            onFamilyName: _adoptFamilyName,
+            knownPeer: trusted ? (name: link.peerName!, id: link.memberId) : null,
           ).run
         : PeerSession(
             identity: identity,
@@ -485,18 +509,12 @@ class NearbyService extends ChangeNotifier {
     _finish(link, result);
   }
 
-  /// A phone that joined by code learns the family's name from the first phone it meets.
-  Future<void> _adoptFamilyName(String name) async {
-    final adopted = await localFamily?.adoptFamilyName(name);
-    if (adopted == null) return;
-
-    _local = adopted;
-    await repository.setFamilyName(adopted.familyName);
-  }
-
   void _roundDone(_Link link, PeerResult result) {
     link.rounds++;
+    link.memberId = result.peerId;
+    link.peerName = result.peerName;
     _watchdog?.cancel();
+    if (result.applied.total > 0) onNews?.call(result);
 
     final peer = link.peer;
     _failures.remove(peer.device);
@@ -509,6 +527,12 @@ class NearbyService extends ChangeNotifier {
     // Another phone of the family is waiting for its turn (one connection at a time): let go
     if (_seen.values.any((other) => other.device != peer.device && _due(other))) {
       _letGo(link);
+      return;
+    }
+
+    // Something was done here while the round was going: it did not make it, so another round now
+    if (repository.isLocal && repository.editMark != link.editMarkAtStart) {
+      _runRound(link);
       return;
     }
 
@@ -595,6 +619,9 @@ class _Link {
   bool finished = false;
   int rounds = 0;
   Timer? nextRound;
+  String? memberId;
+  String? peerName;
+  int editMarkAtStart = 0;
 }
 
 class _RadioChannel implements PeerChannel {

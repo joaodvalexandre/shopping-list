@@ -15,7 +15,7 @@ class LocalPhone {
   final MemoryStore store;
   final Repository repo;
   final LocalFamilyStore keyStore;
-  LocalFamily family;
+  final LocalFamily family;
   final LocalFamilyKey key;
 
   static Future<LocalPhone> start(String name, {String? code, String familyName = ''}) async {
@@ -23,10 +23,11 @@ class LocalPhone {
     final repo = Repository(store);
     final keyStore = LocalFamilyStore(store);
 
-    await repo.startLocal(myName: name, familyName: familyName);
+    final memberId = LocalFamilyStore.newMemberId();
+    await repo.startLocal(myName: name, familyName: familyName, memberId: memberId, creating: code == null);
     final family = code == null
-        ? await keyStore.create(myName: name, familyName: familyName)
-        : await keyStore.join(myName: name, code: code);
+        ? await keyStore.create(myName: name, familyName: familyName, memberId: memberId)
+        : await keyStore.join(myName: name, code: code, memberId: memberId);
 
     return LocalPhone(name, store, repo, family, await LocalFamilyKey.derive(family.code), keyStore);
   }
@@ -37,13 +38,7 @@ class LocalPhone {
         appVersion: version,
         channel: channel,
         displayName: name,
-        familyName: family.familyName,
         timeout: const Duration(seconds: 3),
-        onFamilyName: (familyName) async {
-          final adopted = await keyStore.adoptFamilyName(familyName);
-          if (adopted != null) family = adopted;
-          await repo.setFamilyName(familyName);
-        },
       );
 
   List<String> items(String listName) => repo.itemsOf(repo.lists.firstWhere((l) => l.name == listName).uuid).map((i) => i.name).toList();
@@ -129,7 +124,7 @@ void main() {
     test('swap what each has, the other way round too, and the joining phone learns the family name', () async {
       final ana = await LocalPhone.start('Ana', familyName: 'Silva');
       final bia = await LocalPhone.start('Bia', code: ana.family.code);
-      expect(bia.family.familyName, isEmpty);
+      expect(bia.repo.me!.familyName, isEmpty);
 
       final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
       ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 2);
@@ -140,7 +135,6 @@ void main() {
       expect(forAna.ok, isTrue);
       expect(forBia.ok, isTrue);
       expect(bia.items('Shop'), ['Bread', 'Milk']);
-      expect(bia.family.familyName, 'Silva');
       expect(bia.repo.me!.familyName, 'Silva');
       expect(forBia.peerName, 'Ana');
 
@@ -240,6 +234,100 @@ void main() {
       final (again, _) = await meetLocal(ana, bia);
       expect(again.sent, 0);
       expect(again.applied.total, 0);
+    });
+  });
+
+  group('the family itself', () {
+    test('everyone ends up knowing everyone, and who they are', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final cai = await LocalPhone.start('Cai', code: ana.family.code);
+
+      await meetLocal(ana, bia);
+      await meetLocal(bia, cai); // Ana and Cai never meet: Bia tells each about the other
+      await meetLocal(ana, bia);
+
+      expect(ana.repo.localMembers.map((m) => m.name), ['Ana', 'Bia', 'Cai']);
+      expect(cai.repo.localMembers.map((m) => m.name), ['Cai', 'Ana', 'Bia']); // this phone's person first
+
+      expect(ana.repo.localMembers.firstWhere((m) => m.name == 'Bia').seenAt, isNotNull); // met her
+      expect(ana.repo.localMembers.firstWhere((m) => m.name == 'Cai').seenAt, isNull); // heard of him
+    });
+
+    test('share the family name, its list types and a person changing their name', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia);
+
+      ana.repo.renameFamily('Os Silva');
+      final party = ana.repo.addLocalType('Party');
+      ana.repo.renameLocalType(Repository.localTypeId, 'Groceries');
+      bia.repo.renameMe('Beatriz');
+      await meetLocal(ana, bia);
+
+      for (final phone in [ana, bia]) {
+        expect(phone.repo.me!.familyName, 'Os Silva', reason: phone.name);
+        expect(phone.repo.localTypes.map((t) => t.value), ['Groceries', 'Party'], reason: phone.name);
+        expect(phone.repo.localMembers.map((m) => m.name).toSet(), {'Ana', 'Beatriz'}, reason: phone.name);
+      }
+
+      // a list of the new type made on one phone is of that type on the other
+      final shop = bia.repo.createList(name: 'Birthday', listTypeId: party);
+      await meetLocal(ana, bia);
+      expect(ana.repo.list(shop.uuid)!.listTypeId, party);
+    });
+
+    test('keep a list type that has lists, and pass on the deletion of one that has none', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final party = ana.repo.addLocalType('Party');
+      final spare = ana.repo.addLocalType('Spare');
+      ana.repo.createList(name: 'Birthday', listTypeId: party);
+      await meetLocal(ana, bia);
+
+      expect(ana.repo.deleteLocalType(party), isFalse); // in use
+      expect(ana.repo.deleteLocalType(Repository.localTypeId), isFalse); // the default one stays
+      expect(ana.repo.deleteLocalType(spare), isTrue);
+
+      await meetLocal(ana, bia);
+      expect(bia.repo.localTypes.map((t) => t.key), isNot(contains(spare)));
+      expect(bia.repo.localTypes.map((t) => t.key), contains(party));
+    });
+
+    test('take someone off the list, but never the phone\'s own person', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      await meetLocal(ana, bia);
+
+      final biaId = ana.repo.localMembers.firstWhere((m) => m.name == 'Bia').id;
+      ana.repo.removeLocalMember(ana.repo.localMyId); // not allowed
+      ana.repo.removeLocalMember(biaId);
+      expect(ana.repo.localMembers.map((m) => m.name), ['Ana']);
+
+      await meetLocal(ana, bia);
+
+      // Bia is still Bia on her own phone, but is not brought back on Ana's
+      expect(bia.repo.localMembers.map((m) => m.name), contains('Bia'));
+      expect(ana.repo.localMembers.map((m) => m.name), ['Ana']);
+    });
+
+    test('a connection that is already trusted starts at "ready", with no hello or proof', () async {
+      final ana = await LocalPhone.start('Ana', familyName: 'Silva');
+      final bia = await LocalPhone.start('Bia', code: ana.family.code);
+      final shop = ana.repo.createList(name: 'Shop', listTypeId: Repository.localTypeId);
+      await meetLocal(ana, bia);
+
+      ana.repo.addItem(shop.uuid, name: 'Milk', quantity: 1);
+
+      final (lineA, lineB) = MemoryChannel.pair();
+      final results = await Future.wait([
+        LocalPeerSession(key: ana.key, repository: ana.repo, appVersion: '1.1.0+7', channel: lineA, displayName: 'Ana', knownPeer: (name: 'Bia', id: null)).run(),
+        LocalPeerSession(key: bia.key, repository: bia.repo, appVersion: '1.1.0+7', channel: lineB, displayName: 'Bia', knownPeer: (name: 'Ana', id: null)).run(),
+      ]);
+
+      expect(results.every((r) => r.ok), isTrue);
+      expect(bia.items('Shop'), ['Milk']);
+      expect(results[1].applied.added, ['Milk']);
     });
   });
 
