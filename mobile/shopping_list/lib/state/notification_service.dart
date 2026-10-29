@@ -174,11 +174,11 @@ class LocalNoticeSink implements NoticeSink {
 
   final FlutterLocalNotificationsPlugin _plugin;
 
-  static const _audio = MethodChannel('app.cestou.mobile/sound');
+  static const _audio = MethodChannel('app.familyshopper.mobile/sound');
 
   /// One channel for each kind of thing, so each has its own sound (and the person can change either
   /// in Android's settings). The sound files are `res/raw/sound_<kind>.wav`.
-  static String channelOf(String sound) => 'cestou_$sound';
+  static String channelOf(String sound) => 'familyshopper_$sound';
 
   static const _channelNames = {
     'added': 'New items and lists',
@@ -257,7 +257,7 @@ class LocalNoticeSink implements NoticeSink {
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           channelOf(sound),
-          channelName.isEmpty ? (_channelNames[sound] ?? 'Cestou') : channelName,
+          channelName.isEmpty ? (_channelNames[sound] ?? 'Family Shopper') : channelName,
           // high is what makes it drop down from the top of the screen, with its sound
           importance: Importance.high,
           priority: Priority.high,

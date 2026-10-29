@@ -1,5 +1,5 @@
 {
-    "version": "19480d168ecb8e14",
+    "version": "240fcd9a8a60e3c3",
     "languages": [
         {
             "code": "pt",
@@ -280,7 +280,7 @@
             "bo_menu_delete_warning": "As ligações dentro desta são eliminadas com ela.",
             "bo_perm_group_menus": "Menus",
             "app_server": "Servidor",
-            "app_server_help": "O endereço do servidor do Cestou, por exemplo https://listas.exemplo.pt",
+            "app_server_help": "O endereço do servidor do Family Shopper, por exemplo https://listas.exemplo.pt",
             "app_required": "Obrigatório",
             "app_cannot_reach": "Não foi possível contactar o servidor. Verifica o endereço e a ligação.",
             "app_offline": "Sem ligação",
@@ -368,7 +368,7 @@
             "app_offline_family_unknown": "(aprendido com o primeiro telemóvel que encontrares)",
             "app_offline_leave": "Sair desta família",
             "app_offline_leave_confirm": "Sair da família? As listas são removidas deste telemóvel. Os outros telemóveis ficam com elas.",
-            "app_link_title": "Cestou · família offline",
+            "app_link_title": "Family Shopper · família offline",
             "app_link_connected": "Ligado a :name",
             "app_link_syncing": "A sincronizar com :name",
             "app_link_connecting": "A ligar a :name",
@@ -443,7 +443,7 @@
             "app_notice_item_removed": ":name removeu :item",
             "app_notice_item_removed_many": ":name removeu :count itens",
             "app_notice_list_removed": ":name eliminou esta lista",
-            "app_link_title_online": "Cestou · a vigiar as listas da família",
+            "app_link_title_online": "Family Shopper · a vigiar as listas da família",
             "app_link_watching": "És avisado logo do que os outros fazem",
             "app_settings_appearance": "Aspeto",
             "app_settings_connection": "Ligação",
@@ -470,7 +470,7 @@
             "app_channel_cart": "Carrinho",
             "app_channel_bought": "Compras",
             "app_channel_changes": "Alterações e remoções",
-            "app_link_close": "Fechar o Cestou"
+            "app_link_close": "Fechar o Family Shopper"
         },
         "en": {
             "pending": "Pending",
@@ -737,7 +737,7 @@
             "bo_menu_delete_warning": "Links under this one are deleted with it.",
             "bo_perm_group_menus": "Menus",
             "app_server": "Server",
-            "app_server_help": "The address of the Cestou server, such as https://lists.example.com",
+            "app_server_help": "The address of the Family Shopper server, such as https://lists.example.com",
             "app_required": "Required",
             "app_cannot_reach": "Could not reach the server. Check the address and your connection.",
             "app_offline": "Offline",
@@ -825,7 +825,7 @@
             "app_offline_family_unknown": "(learned from the first phone you meet)",
             "app_offline_leave": "Leave this family",
             "app_offline_leave_confirm": "Leave the family? Its lists are removed from this phone. The other phones keep them.",
-            "app_link_title": "Cestou · offline family",
+            "app_link_title": "Family Shopper · offline family",
             "app_link_connected": "Connected to :name",
             "app_link_syncing": "Syncing with :name",
             "app_link_connecting": "Connecting to :name",
@@ -900,7 +900,7 @@
             "app_notice_item_removed": ":name removed :item",
             "app_notice_item_removed_many": ":name removed :count items",
             "app_notice_list_removed": ":name deleted this list",
-            "app_link_title_online": "Cestou · watching the family's lists",
+            "app_link_title_online": "Family Shopper · watching the family's lists",
             "app_link_watching": "You are told at once what others do",
             "app_settings_appearance": "Appearance",
             "app_settings_connection": "Connection",
@@ -927,7 +927,7 @@
             "app_channel_cart": "Cart",
             "app_channel_bought": "Purchases",
             "app_channel_changes": "Changes and removals",
-            "app_link_close": "Close Cestou"
+            "app_link_close": "Close Family Shopper"
         }
     },
     "pages": [

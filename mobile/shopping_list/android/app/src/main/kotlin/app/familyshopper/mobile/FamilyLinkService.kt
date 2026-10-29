@@ -1,4 +1,4 @@
-package app.cestou.mobile
+package app.familyshopper.mobile
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -63,7 +63,7 @@ class FamilyLinkService : Service() {
             return START_NOT_STICKY
         }
 
-        val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Cestou"
+        val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Family Shopper"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         intent?.getStringExtra(EXTRA_CLOSE)?.let { closeLabel = it }
         val notification = build(title, text)
@@ -118,11 +118,11 @@ class FamilyLinkService : Service() {
 
     companion object {
         var instance: FamilyLinkService? = null
-        const val ACTION_STOP = "app.cestou.mobile.STOP_FAMILY_LINK"
+        const val ACTION_STOP = "app.familyshopper.mobile.STOP_FAMILY_LINK"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
         const val EXTRA_CLOSE = "close"
-        const val ACTION_QUIT = "app.cestou.mobile.QUIT"
+        const val ACTION_QUIT = "app.familyshopper.mobile.QUIT"
         private const val CHANNEL_ID = "family_link"
         private const val NOTIFICATION_ID = 7001
     }

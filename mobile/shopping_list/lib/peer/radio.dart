@@ -50,7 +50,7 @@ abstract class NearbyRadio {
 
 /// Google's Nearby Connections, through the `nearby_connections` plugin.
 class PluginRadio implements NearbyRadio {
-  static const serviceId = 'app.cestou.mobile.sync';
+  static const serviceId = 'app.familyshopper.mobile.sync';
 
   final _nearby = Nearby();
   RadioEvents? _events;

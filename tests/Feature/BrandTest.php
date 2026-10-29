@@ -14,5 +14,5 @@ it('ships the icon files the pages point at', function () {
         expect(file_exists(public_path($file)))->toBeTrue("missing public/{$file}");
     }
 
-    expect(json_decode(file_get_contents(public_path('site.webmanifest')), true)['name'])->toBe('Cestou');
+    expect(json_decode(file_get_contents(public_path('site.webmanifest')), true)['name'])->toBe('Family Shopper');
 });

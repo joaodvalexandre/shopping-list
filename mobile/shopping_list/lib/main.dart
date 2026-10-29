@@ -167,7 +167,7 @@ class ShoppingListApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navigatorKey,
       navigatorObservers: [_UnfocusObserver()],
-      title: 'Cestou',
+      title: 'Family Shopper',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

@@ -1,4 +1,4 @@
-package app.cestou.mobile
+package app.familyshopper.mobile
 
 import android.content.Context
 import android.content.Intent
@@ -29,7 +29,7 @@ class MainActivity : FlutterActivity() {
     override fun shouldDestroyEngineWithHost(): Boolean = false
 
     companion object {
-        private const val ENGINE_ID = "cestou_main"
+        private const val ENGINE_ID = "familyshopper_main"
 
         /** The app's engine: made once, the first time the screen opens, and kept. */
         fun engine(app: Context): FlutterEngine {
@@ -49,7 +49,7 @@ class MainActivity : FlutterActivity() {
         // The sound of a banner inside the app (a phone notification brings its own): `res/raw/sound_<kind>.wav`,
         // played as a notification sound, so it follows the phone's notification volume and silent mode
         private fun registerSound(engine: FlutterEngine, app: Context) {
-            MethodChannel(engine.dartExecutor.binaryMessenger, "app.cestou.mobile/sound").setMethodCallHandler { call, result ->
+            MethodChannel(engine.dartExecutor.binaryMessenger, "app.familyshopper.mobile/sound").setMethodCallHandler { call, result ->
                 if (call.method != "play") return@setMethodCallHandler result.notImplemented()
 
                 val id = app.resources.getIdentifier("sound_" + call.argument<String>("sound"), "raw", app.packageName)
@@ -72,7 +72,7 @@ class MainActivity : FlutterActivity() {
 
         // The app asks for the notification that keeps it alive in the background (or to drop it)
         private fun registerChannels(engine: FlutterEngine, app: Context) {
-            MethodChannel(engine.dartExecutor.binaryMessenger, "app.cestou.mobile/family_link").setMethodCallHandler { call, result ->
+            MethodChannel(engine.dartExecutor.binaryMessenger, "app.familyshopper.mobile/family_link").setMethodCallHandler { call, result ->
                 when (call.method) {
                     "start" -> {
                         val intent = Intent(app, FamilyLinkService::class.java)
@@ -88,7 +88,7 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "update" -> {
-                        FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Cestou", call.argument<String>("text") ?: "", call.argument<String>("close"))
+                        FamilyLinkService.instance?.refresh(call.argument<String>("title") ?: "Family Shopper", call.argument<String>("text") ?: "", call.argument<String>("close"))
                         result.success(FamilyLinkService.instance != null)
                     }
                     "stop" -> {

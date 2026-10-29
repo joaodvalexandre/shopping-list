@@ -1,4 +1,4 @@
-# Cestou's copy of nearby_connections 4.3.0
+# Family Shopper's copy of nearby_connections 4.3.0
 
 The only change from the published package is in
 `android/src/main/java/com/pkmnapps/nearby_connections/NearbyConnectionsPlugin.java`:

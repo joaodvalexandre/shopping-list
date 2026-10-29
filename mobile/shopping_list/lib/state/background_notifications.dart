@@ -15,7 +15,7 @@ import 'notification_service.dart';
 import 'settings_state.dart';
 
 const _taskName = 'check-activity';
-const _uniqueName = 'cestou-activity';
+const _uniqueName = 'familyshopper-activity';
 
 /// Set (by the "Close" button of the notification that keeps the app alive) when the person closed the
 /// app completely: nothing runs, not even the scheduled checks, until they open the app again.

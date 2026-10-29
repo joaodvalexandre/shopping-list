@@ -11,7 +11,7 @@ import 'settings_state.dart';
 /// Only for a local family (a server family asks the server, and has notifications for that).
 class FamilyLink {
   FamilyLink({required this.auth, required this.nearby, required this.settings, this.displayName, MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel('app.cestou.mobile/family_link') {
+      : _channel = channel ?? const MethodChannel('app.familyshopper.mobile/family_link') {
     auth.addListener(update);
     nearby.addListener(update);
     settings.addListener(update);

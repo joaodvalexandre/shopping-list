@@ -49,7 +49,7 @@ import io.flutter.plugin.common.EventChannel;
 public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin, ActivityAware {
 	private Activity activity;
 
-	// Cestou: the application's context, not the screen: Google tears down what was made through an
+	// Family Shopper: the application's context, not the screen: Google tears down what was made through an
 	// Activity when that screen is destroyed, and the family's phones must stay connected without one.
 	private Context context;
 	private static final String SERVICE_ID = "com.pkmnapps.nearby_connections";

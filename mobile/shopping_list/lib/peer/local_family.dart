@@ -142,13 +142,13 @@ class LocalFamilyInvite {
   final String familyName;
 
   static String encode(String code, String familyName) =>
-      Uri(scheme: 'cestou', host: 'join', queryParameters: {'code': code, if (familyName.isNotEmpty) 'family': familyName}).toString();
+      Uri(scheme: 'familyshopper', host: 'join', queryParameters: {'code': code, if (familyName.isNotEmpty) 'family': familyName}).toString();
 
   static LocalFamilyInvite? parse(String text) {
     final trimmed = text.trim();
 
     final uri = Uri.tryParse(trimmed);
-    if (uri != null && uri.scheme == 'cestou' && uri.host == 'join') {
+    if (uri != null && uri.scheme == 'familyshopper' && uri.host == 'join') {
       final code = LocalFamilyCodes.normalise(uri.queryParameters['code'] ?? '');
       return code == null ? null : LocalFamilyInvite(code: code, familyName: uri.queryParameters['family'] ?? '');
     }

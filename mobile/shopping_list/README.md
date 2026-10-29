@@ -1,6 +1,6 @@
-# Cestou - mobile app
+# Family Shopper - mobile app
 
-The Android app of the Cestou web app (see the [project README](../../README.md)). It signs in with the same account as the web, keeps the family's lists on the phone so it works **offline**, and syncs with the server through the [mobile API](../../docs/api.md).
+The Android app of the Family Shopper web app (see the [project README](../../README.md)). It signs in with the same account as the web, keeps the family's lists on the phone so it works **offline**, and syncs with the server through the [mobile API](../../docs/api.md).
 
 ## What it does
 
@@ -23,7 +23,7 @@ Not in the app yet: nothing planned.
 
 ## Name and icon
 
-The app is called **Cestou** (Android id `app.cestou.mobile`). The icon is a basket with a tick; its sources are SVGs in `assets/icon`. To change it: edit them, then `node assets/icon/render.mjs` (needs Chrome; also refreshes the web app's favicon and logos) and `dart run flutter_launcher_icons`.
+The app is called **Family Shopper** (Android id `app.familyshopper.mobile`). The icon is a basket with a tick; its sources are SVGs in `assets/icon`. To change it: edit them, then `node assets/icon/render.mjs` (needs Chrome; also refreshes the web app's favicon and logos) and `dart run flutter_launcher_icons`.
 
 ## Running it
 

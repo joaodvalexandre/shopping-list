@@ -1,6 +1,6 @@
 {
-    "name": "Cestou",
-    "short_name": "Cestou",
+    "name": "Family Shopper",
+    "short_name": "Family Shopper",
     "description": "The family shopping list",
     "start_url": "/",
     "display": "standalone",

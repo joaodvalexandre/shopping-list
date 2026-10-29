@@ -1,6 +1,6 @@
-# Cestou
+# Family Shopper
 
-A shared shopping list for families (*cestou*: from *cesta*, Portuguese for basket). A web app (Laravel + Livewire) where each family manages its own lists, and a Flutter mobile app that syncs with it.
+A shared shopping list for families. A web app (Laravel + Livewire) where each family manages its own lists, and a Flutter mobile app that syncs with it.
 
 - Accounts are **created by an administrator**; there is no public sign-up.
 - Every family has its own members, list types and lists, and cannot see anyone else's.

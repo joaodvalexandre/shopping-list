@@ -281,7 +281,7 @@
     "bo_perm_group_menus":      "Menus",
 
     "app_server":               "Servidor",
-    "app_server_help":          "O endereço do servidor do Cestou, por exemplo https://listas.exemplo.pt",
+    "app_server_help":          "O endereço do servidor do Family Shopper, por exemplo https://listas.exemplo.pt",
     "app_required":             "Obrigatório",
     "app_cannot_reach":         "Não foi possível contactar o servidor. Verifica o endereço e a ligação.",
     "app_offline":              "Sem ligação",
@@ -369,7 +369,7 @@
     "app_offline_family_unknown": "(aprendido com o primeiro telemóvel que encontrares)",
     "app_offline_leave": "Sair desta família",
     "app_offline_leave_confirm": "Sair da família? As listas são removidas deste telemóvel. Os outros telemóveis ficam com elas.",
-    "app_link_title": "Cestou · família offline",
+    "app_link_title": "Family Shopper · família offline",
     "app_link_connected": "Ligado a :name",
     "app_link_syncing": "A sincronizar com :name",
     "app_link_connecting": "A ligar a :name",
@@ -444,7 +444,7 @@
     "app_notice_item_removed": ":name removeu :item",
     "app_notice_item_removed_many": ":name removeu :count itens",
     "app_notice_list_removed": ":name eliminou esta lista",
-    "app_link_title_online": "Cestou · a vigiar as listas da família",
+    "app_link_title_online": "Family Shopper · a vigiar as listas da família",
     "app_link_watching": "És avisado logo do que os outros fazem",
     "app_settings_appearance": "Aspeto",
     "app_settings_connection": "Ligação",
@@ -471,5 +471,5 @@
     "app_channel_cart": "Carrinho",
     "app_channel_bought": "Compras",
     "app_channel_changes": "Alterações e remoções",
-    "app_link_close": "Fechar o Cestou"
+    "app_link_close": "Fechar o Family Shopper"
 }
