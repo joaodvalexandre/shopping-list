@@ -160,7 +160,7 @@ public/mix-manifest.json
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon
+# (macOS's "Icon" file; a plain "Icon" rule would hide this project's assets/icon folder)
 ._*
 .DocumentRevisions-V100
 .fseventsd
