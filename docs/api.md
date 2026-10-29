@@ -16,6 +16,7 @@ All requests and responses are JSON. Send `Accept: application/json` and, for bo
 | Times | ISO-8601 in UTC with milliseconds, e.g. `2026-10-28T21:01:16.123Z` (the device list uses `+00:00` offsets instead). Any ISO-8601 value is accepted when sending |
 | IDs | Lists and items are identified by a **uuid** that the phone generates itself, so they can be created offline. Numeric ids are only used for list types and users |
 | Item status | `to_buy`, `in_cart`, `purchased` |
+| Language | Send `Accept-Language: pt` (the language the app shows) and the server's own messages, such as validation errors, come back in it. A language that is not on offer, or none, gives the default |
 
 ### Errors
 
@@ -202,6 +203,40 @@ Every synced field has its own change time, so two phones editing *different* fi
 - Changed since `since`; plus, in full, any visible list not in `known_lists` (newly granted or un-hidden).
 - Tombstones for lists in `known_lists` and for items of visible lists.
 - `hidden_from` on a list is included only for users who may manage it.
+
+## Family administration
+
+For **family admins** only (anyone else gets `403`). These change other people's accounts, so they need a connection and take effect at once. The rules are the web Family pages' own: a family always keeps an admin, nobody deletes themselves, a list type that still has lists stays, and a new or reset password is the family's name, to be replaced at the first login. Everything is scoped to the admin's family; another family's member or list type is a `404`.
+
+### `GET /family`
+
+```json
+{
+  "members": [
+    { "id": 2, "name": "Bia", "email": "bia@example.com", "role": "member", "must_change_password": false,
+      "permissions": { "7": { "can_view": true, "can_add_items": true, "can_edit_items": false, "can_change_status": true, "can_manage_lists": false } } }
+  ],
+  "list_types": [ { "id": 7, "name": "Groceries", "lists_count": 3 } ]
+}
+```
+
+`permissions` is per list type id; a type the member has nothing on is absent (and PHP sends an empty one as `[]`).
+
+### `POST /family/members` and `PUT /family/members/{id}`
+
+Body: `name`, `email` (unique), `role` (`admin` or `member`) and `permissions` (`{ "<list type id>": { "can_view": true, ... } }`, which replaces what the member had; any ability implies `can_view`; list types of other families are ignored). Admins can do everything, so send no permissions for them. Create answers `201` with `{ "member": {...}, "temporary_password": "Silva" }`; update answers `{ "member": {...} }`. Demoting the last admin is `422` with `errors.member`.
+
+### `DELETE /family/members/{id}`
+
+Removes the member and signs their phones out. Removing yourself, or the last admin, is `422` with `errors.member`.
+
+### `POST /family/members/{id}/reset-password`
+
+`{ "temporary_password": "Silva" }`: the member must choose a new one at their next sign-in, and is signed out everywhere.
+
+### `POST /family/list-types`, `PUT /family/list-types/{id}`, `DELETE /family/list-types/{id}`
+
+Body `{ "name": "Pharmacy" }` (unique in the family, up to 100 characters). Create answers `201` with `{ "list_type": { "id", "name", "lists_count" } }`. Deleting a type that still has lists is `422` with `errors.list_type`.
 
 ## Content
 

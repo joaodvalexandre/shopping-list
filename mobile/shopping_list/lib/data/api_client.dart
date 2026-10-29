@@ -46,6 +46,9 @@ class ApiClient {
 
   String baseUrl;
   String? token;
+
+  /// The language the app shows, so the server's own messages come back in it.
+  String? language;
   final http.Client _client;
 
   static const _timeout = Duration(seconds: 20);
@@ -67,6 +70,7 @@ class ApiClient {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
+        'Accept-Language': ?language,
       };
 
   Future<Map<String, dynamic>> _send(String method, String path, {Object? body}) async {
@@ -158,6 +162,25 @@ class ApiClient {
   }
 
   Future<void> removeDevice(int id) => _send('DELETE', '/me/devices/$id');
+
+  // ---- Family administration (family admins only; needs a connection)
+
+  Future<Map<String, dynamic>> family() => _send('GET', '/family');
+
+  Future<Map<String, dynamic>> createMember(Map<String, dynamic> member) => _send('POST', '/family/members', body: member);
+
+  Future<Map<String, dynamic>> updateMember(int id, Map<String, dynamic> member) => _send('PUT', '/family/members/$id', body: member);
+
+  Future<void> deleteMember(int id) => _send('DELETE', '/family/members/$id');
+
+  /// Returns the new temporary password.
+  Future<String> resetMemberPassword(int id) async => (await _send('POST', '/family/members/$id/reset-password'))['temporary_password'] as String;
+
+  Future<void> createListType(String name) => _send('POST', '/family/list-types', body: {'name': name});
+
+  Future<void> renameListType(int id, String name) => _send('PUT', '/family/list-types/$id', body: {'name': name});
+
+  Future<void> deleteListType(int id) => _send('DELETE', '/family/list-types/$id');
 
   Future<Map<String, dynamic>> sync(Map<String, dynamic> payload) => _send('POST', '/sync', body: payload);
 

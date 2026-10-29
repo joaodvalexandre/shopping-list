@@ -3,6 +3,15 @@ import '../core/time.dart';
 /// What the signed-in person may do with a list type (the API's `permissions`).
 enum Ability { view, addItems, editItems, changeStatus, manageLists }
 
+/// The API's name for each ability, in the order the screens show them.
+const abilityKeys = {
+  Ability.view: 'can_view',
+  Ability.addItems: 'can_add_items',
+  Ability.editItems: 'can_edit_items',
+  Ability.changeStatus: 'can_change_status',
+  Ability.manageLists: 'can_manage_lists',
+};
+
 class Me {
   Me({
     required this.userId,
@@ -53,19 +62,11 @@ class Me {
         (type['id'] as num).toInt(): type['name'] as String,
     };
 
-    const keys = {
-      'can_view': Ability.view,
-      'can_add_items': Ability.addItems,
-      'can_edit_items': Ability.editItems,
-      'can_change_status': Ability.changeStatus,
-      'can_manage_lists': Ability.manageLists,
-    };
-
     final permissions = <int, Map<Ability, bool>>{};
     asMap(json['permissions']).forEach((typeId, abilities) {
       final map = asMap(abilities);
       permissions[int.parse(typeId)] = {
-        for (final entry in keys.entries) entry.value: map[entry.key] == true,
+        for (final entry in abilityKeys.entries) entry.key: map[entry.value] == true,
       };
     });
 

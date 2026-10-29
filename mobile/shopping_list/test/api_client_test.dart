@@ -70,4 +70,23 @@ void main() {
     expect(await up.isReachable(), isTrue);
     expect(await down.isReachable(), isFalse);
   });
+
+  test('tells the server which language the app shows', () async {
+    late http.Request seen;
+    final api = ApiClient(
+      baseUrl: 'http://server',
+      client: MockClient((request) async {
+        seen = request;
+        return http.Response(jsonEncode({'members': [], 'list_types': []}), 200);
+      }),
+    );
+
+    await api.family();
+    expect(seen.headers.containsKey('Accept-Language'), isFalse);
+
+    api.language = 'pt';
+    await api.family();
+    expect(seen.headers['Accept-Language'], 'pt');
+    expect(seen.url.toString(), 'http://server/api/v1/family');
+  });
 }

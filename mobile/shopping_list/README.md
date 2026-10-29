@@ -14,7 +14,9 @@ The Android app of the Cestou web app (see the [project README](../../README.md)
 - **Footer and account menu links** come from the backoffice (Menus), in the app's language, and are kept in that database. A page opens **inside the app** from the local copy; only a link to an outside address opens the browser.
 - **Export** a list as a markdown checklist to any app, **finish** a list, create/edit lists and choose who a list is hidden from.
 
-Not in the app yet (done on the web): managing family members, list types and permissions. Phone-to-phone sync is planned.
+- **Family** (family admins only, a third tab): members with their role and first-login status, add/edit with a permission chip per ability and list type, reset a password (the temporary password is shown with a Copy button), remove, and the family's list types. These need a connection; the rules (last admin, a type in use...) are the server's, and its messages come back in the app's language.
+
+Not in the app yet: phone-to-phone sync.
 
 ## Name and icon
 

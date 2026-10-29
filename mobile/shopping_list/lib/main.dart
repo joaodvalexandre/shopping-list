@@ -24,7 +24,8 @@ Future<void> main() async {
   final repository = Repository(db);
   await repository.load();
 
-  final api = ApiClient(baseUrl: settings.serverUrl);
+  final api = ApiClient(baseUrl: settings.serverUrl)..language = settings.language;
+  settings.addListener(() => api.language = settings.language);
   final auth = AuthState(api: api, repository: repository, settings: settings);
   final sync = SyncService(api: api, repository: repository, auth: auth);
 

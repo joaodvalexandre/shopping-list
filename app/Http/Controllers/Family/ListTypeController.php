@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Family;
 
 use App\Http\Controllers\Controller;
 use App\Models\ListType;
+use App\Services\FamilyAdministration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class ListTypeController extends Controller
 {
@@ -23,13 +23,13 @@ class ListTypeController extends Controller
         return view('family.list_types.create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, FamilyAdministration $family): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', $this->uniqueName($request)],
         ]);
 
-        ListType::create($data + ['family_id' => $request->user()->family_id]);
+        $family->createListType($request->user(), $data['name']);
         $this->notificationToggle('list_type_created_success', 'success');
 
         return redirect()->route('family.list-types.index');
@@ -54,18 +54,9 @@ class ListTypeController extends Controller
         return redirect()->route('family.list-types.index');
     }
 
-    public function destroy(Request $request, string $listType): RedirectResponse
+    public function destroy(Request $request, string $listType, FamilyAdministration $family): RedirectResponse
     {
-        $type = $this->find($request, $listType);
-
-        if ($type->shoppingLists()->exists()) {
-            throw ValidationException::withMessages(['list_type' => __('list_type_in_use')]);
-        }
-
-        // Deleted lists linger as tombstones for syncing devices and would
-        // block the foreign key; the type is going away, so they can too.
-        $type->shoppingLists()->onlyTrashed()->forceDelete();
-        $type->delete();
+        $family->deleteListType($this->find($request, $listType));
         $this->notificationToggle('list_type_destroyed_success', 'success');
 
         return redirect()->route('family.list-types.index');

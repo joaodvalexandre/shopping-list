@@ -6,11 +6,10 @@ use App\Enums\FamilyRole;
 use App\Http\Controllers\Controller;
 use App\Models\ListType;
 use App\Models\User;
-use App\Support\TemporaryPassword;
+use App\Services\FamilyAdministration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class MemberController extends Controller
 {
@@ -35,7 +34,7 @@ class MemberController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, FamilyAdministration $family): RedirectResponse
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -44,17 +43,7 @@ class MemberController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        $temporary = TemporaryPassword::for($request->user()->family);
-
-        $member = User::create([
-            'family_id' => $request->user()->family_id,
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'role' => $data['role'],
-            'password' => $temporary,
-            'must_change_password' => true,
-        ]);
-        $member->syncListPermissions($data['permissions'] ?? []);
+        [$member, $temporary] = $family->createMember($request->user(), $data);
 
         return redirect()->route('family.members.index')
             ->with('temporary_password', ['email' => $member->email, 'password' => $temporary]);
@@ -71,7 +60,7 @@ class MemberController extends Controller
         ]);
     }
 
-    public function update(Request $request, User $member): RedirectResponse
+    public function update(Request $request, User $member, FamilyAdministration $family): RedirectResponse
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -80,48 +69,24 @@ class MemberController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        $newRole = FamilyRole::from($data['role']);
-        if ($member->isFamilyAdmin() && $newRole !== FamilyRole::Admin) {
-            $this->ensureNotLastAdmin($member);
-        }
-
-        $member->update([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'role' => $newRole,
-        ]);
-        $member->syncListPermissions($data['permissions'] ?? []);
+        $family->updateMember($member, $data);
 
         $this->notificationToggle('member_updated_success', 'success');
 
         return redirect()->route('family.members.index');
     }
 
-    public function destroy(Request $request, User $member): RedirectResponse
+    public function destroy(Request $request, User $member, FamilyAdministration $family): RedirectResponse
     {
-        if ($member->is($request->user())) {
-            throw ValidationException::withMessages(['member' => __('cannot_delete_yourself')]);
-        }
-
-        if ($member->isFamilyAdmin()) {
-            $this->ensureNotLastAdmin($member);
-        }
-
-        $member->tokens()->delete();
-        $member->delete();
+        $family->deleteMember($request->user(), $member);
         $this->notificationToggle('member_destroyed_success', 'success');
 
         return redirect()->route('family.members.index');
     }
 
-    public function resetPassword(User $member): RedirectResponse
+    public function resetPassword(User $member, FamilyAdministration $family): RedirectResponse
     {
-        $temporary = TemporaryPassword::for($member->family);
-        $member->update(['password' => $temporary, 'must_change_password' => true]);
-
-        // Sign the member out everywhere: "remember me" cookies and every phone
-        $member->forceFill(['remember_token' => null])->save();
-        $member->tokens()->delete();
+        $temporary = $family->resetPassword($member);
 
         return redirect()->route('family.members.index')
             ->with('temporary_password', ['email' => $member->email, 'password' => $temporary]);
@@ -130,18 +95,5 @@ class MemberController extends Controller
     private function familyTypes(Request $request)
     {
         return ListType::where('family_id', $request->user()->family_id)->orderBy('name')->get();
-    }
-
-    /** A family must always keep at least one admin. */
-    private function ensureNotLastAdmin(User $member): void
-    {
-        $otherAdmins = User::where('family_id', $member->family_id)
-            ->where('role', FamilyRole::Admin->value)
-            ->where('id', '!=', $member->id)
-            ->count();
-
-        if ($otherAdmins === 0) {
-            throw ValidationException::withMessages(['member' => __('last_admin_error')]);
-        }
     }
 }

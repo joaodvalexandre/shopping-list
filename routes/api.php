@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ContentController;
+use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\SyncController;
 use Illuminate\Support\Facades\Route;
@@ -36,5 +37,17 @@ Route::prefix('v1')->group(function () {
         Route::delete('me/devices/{device}', [MeController::class, 'revokeDevice']);
 
         Route::post('sync', SyncController::class);
+
+        // Family administration, for family admins only (the web's Family pages)
+        Route::middleware('can:manage-family')->prefix('family')->group(function () {
+            Route::get('/', [FamilyController::class, 'show']);
+            Route::post('members', [FamilyController::class, 'storeMember']);
+            Route::put('members/{member}', [FamilyController::class, 'updateMember']);
+            Route::delete('members/{member}', [FamilyController::class, 'destroyMember']);
+            Route::post('members/{member}/reset-password', [FamilyController::class, 'resetPassword']);
+            Route::post('list-types', [FamilyController::class, 'storeType']);
+            Route::put('list-types/{type}', [FamilyController::class, 'updateType'])->whereNumber('type');
+            Route::delete('list-types/{type}', [FamilyController::class, 'destroyType'])->whereNumber('type');
+        });
     });
 });
